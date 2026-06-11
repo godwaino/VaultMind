@@ -37,7 +37,7 @@ Everything below follows from four non-negotiable constraints in the PRD:
 │  │ Encrypted │  │ SQLite +  │  │ On-device  │  │ Local notification          │  │
 │  │ file store│  │ FTS5 index│  │ AI runtime │  │ scheduler (Expo)            │  │
 │  │ (AES-256) │  │ (metadata)│  │ Tesseract  │  └─────────────────────────────┘  │
-│  └───────────┘  └───────────┘  │ Llama 1B/3B│                                   │
+│  └───────────┘  └───────────┘  │ SLM (1B)  │                                   │
 │                                │ (llama.rn) │                                   │
 │                                └────────────┘                                   │
 └───────────────┬───────────────────────────────────────────┬─────────────────────┘
@@ -102,7 +102,8 @@ KEK ──wraps──► backup envelope key (only when cloud backup enabled)
 ```
 
 - Local at-rest encryption is independent of the password (so biometric unlock works offline without re-deriving the KEK).
-- Backup encryption uses the password-derived KEK → server is zero-knowledge (NFR-SEC-003). **Consequence to surface in UX:** a forgotten password makes cloud backups unrecoverable; the recovery flow resets the account, not the data. The PRD's zero-knowledge requirement makes this unavoidable — call it out on the backup consent screen (REQ-VAULT-024).
+- Backup encryption uses the password-derived KEK → server is zero-knowledge (NFR-SEC-003). **Recovery is provided in MVP (decision, see `docs/DECISIONS.md` #2):** on enabling backup we generate a **recovery phrase** (BIP39-style word list) that re-derives the backup key independently of the password, shown once with a confirm step; a non-technical fallback is an encrypted **recovery kit** file the user saves themselves. Either path restores backups after a password reset without giving the server a decryption key, so zero-knowledge holds. A user who declines both still cannot recover a forgotten-password backup — state this on the backup consent screen (REQ-VAULT-024).
+- **Free-tier backup (decision, DECISIONS.md #1):** optional, opt-in, client-side-encrypted backup up to **5 GB** is available on the free tier so a lost phone need not wipe a free user's vault. Local-first remains the default; privacy-sensitive users leave backup off.
 - Deletion: 7-day grace (REQ-VAULT-020) = soft-delete flag + scheduled purge job in the app; purge destroys the DEK first (crypto-shredding), then the file.
 
 ### 3.3 Document ingestion pipeline (Vault)
@@ -133,13 +134,16 @@ The pipeline is a resumable job queue (persisted in SQLite) so an app kill mid-O
 
 ### 3.5 On-device AI runtime
 
+**Design rule (decision, DECISIONS.md #3): local = SLM, cloud = LLM, the subscriber chooses.** On-device work runs a *small* language model sized for 2–4 GB-RAM market devices; deeper analysis runs a full LLM (Claude) in the cloud. The user picks: privacy-maximising users stay on the SLM; users who want depth and consent to egress use the cloud LLM (available on the free tier per DECISIONS.md #1). A device that can't run the SLM routes to the cloud LLM with consent — so "your data never leaves your device" stays true for those who choose it, instead of silently failing on low-end hardware.
+
 | Task | Model | Runtime | Notes |
 |---|---|---|---|
 | OCR | Tesseract | `react-native-tesseract-ocr` | eng traineddata bundled; preprocessing (deskew, binarise) before OCR materially lifts accuracy on phone photos |
-| Classification + metadata extraction | Llama 3.2 1B (Q4) | `llama.rn` | Constrained generation (GBNF grammar) to force JSON output for the 6 categories + fields |
-| ContractScan Tier 1 | Llama 3.2 3B (Q4) | `llama.rn` | Chunked map-reduce over ≤10 pages; ~2GB RAM budget — gate Tier 1 by device RAM, low-end devices route to Tier 2 (with consent) or "summary-only" local mode |
+| Classification + metadata extraction | SLM, Llama 3.2 1B (Q4) class | `llama.rn` | Constrained generation (GBNF grammar) to force JSON output for the 6 categories + fields |
+| ContractScan Tier 1 (local) | **SLM** — 1B-class (Llama 3.2 1B Q4) starting candidate, sub-1B fallback if RAM headroom is tight | `llama.rn` | Chunked map-reduce over ≤10 pages, sized to run on 2–4 GB-RAM devices. Model is a **config value fixed by the week-1 device test** (PLAN Phase 0). If a device can't run it, route to the cloud LLM (Tier 2) with consent |
+| ContractScan Tier 2 (cloud) | **LLM** — Claude (see §6.3) | server proxy | Full-depth analysis; consent-gated egress; available on free tier per DECISIONS.md #1 |
 
-Models ship in the app bundle (or first-run download over Wi-Fi to keep store binary small — decision ADR-003). Model updates ride app releases (per risk register).
+Models ship in the app bundle (or first-run download over Wi-Fi to keep store binary small — decision ADR-003). Model updates ride app releases (per risk register). The earlier 3B on-device model is **dropped** in favour of an SLM that fits the actual market hardware (DECISIONS.md #3, ADR-011).
 
 ---
 
@@ -235,8 +239,8 @@ Notably absent server-side: document text, OCR output, categories, expiry dates,
 ```
 contract uploaded (PDF/JPG/PNG, ≤50pp)
   → page count + device RAM + local-model confidence pre-check
-  ├─ ≤10 pages AND device supports 3B model → Tier 1 (on-device, no egress)  [REQ-CONTRACT-004]
-  └─ >10 pages OR multi-party OR low local confidence OR user chose "deeper analysis"
+  ├─ ≤10 pages AND device runs the on-device SLM AND user chose local → Tier 1 (on-device SLM, no egress)  [REQ-CONTRACT-004]
+  └─ >10 pages OR multi-party OR low local confidence OR device can't run the SLM OR user chose "deeper analysis"
        → non-dismissable consent gate (exact PRD copy, "I Understand, Proceed" /
          "Analyse Locally Only")                                            [REQ-CONTRACT-005]
        → Tier 2: POST /api/contractscan/analyze
@@ -343,14 +347,18 @@ Implementation notes:
 - **PDF input** is native (document content block, base64). Images (photographed contracts) go as image blocks. The 50-page PRD cap is inside the API's PDF limits.
 - **Streaming** protects against HTTP timeouts on long analyses and feeds the progress UI.
 - **Error handling:** typed SDK exceptions; map 429/529 to a friendly "busy, retrying" state with the SDK's built-in backoff; check `stop_reason` — surface a `refusal` as "this document couldn't be analysed" with the local-only option; `max_tokens` → retry at a higher cap.
-- **Retention / "ephemeral" claim (compliance action item).** REQ-CONTRACT-005's consent copy promises "processed immediately and permanently deleted — never stored on our servers." On *our* servers that's enforced by the in-memory design above. For Anthropic's side, API inputs/outputs are subject to Anthropic's retention policy — **before launch, obtain a zero-data-retention (ZDR) arrangement for the organisation, or align the consent-screen wording with the provider's actual retention terms.** Also enable the org setting to exclude data from training (default) and record this in the NDPR records of processing. Owner: founder; due: Phase 3 exit.
+- **Retention / "ephemeral" claim — global best practice (decision, DECISIONS.md #7).** REQ-CONTRACT-005's consent copy promises "processed immediately and permanently deleted — never stored on our servers." On *our* servers that's true (in-memory design above). It is **not ours to promise for Anthropic or Google Vision**, and under the NDPA that consent copy is a regulated representation, so it must be accurate. Posture, in order of preference:
+  1. **Sign a zero-data-retention (ZDR) agreement before relying on the absolute claim.** Anthropic's API default is **30-day** retention for abuse monitoring; **ZDR is a separate enterprise agreement granted per-organisation**, not on by default. Constraint that feeds model choice: **ZDR is not available for the Fable/Mythos model families** ("covered models", 30-day retention required) — if the analysis model must be ZDR-eligible, those families are out. Do the equivalent for OCR (ZDR with Google, or a no-retention OCR path).
+  2. **If ZDR isn't in place, don't claim absolute deletion.** Use accurate copy: name the sub-processor, state content is sent for analysis and retained by the provider only transiently for abuse monitoring (up to 30 days) and not used for training, and link the provider's policy.
+  3. **Always:** keep training-exclusion on (Anthropic default), maintain a sub-processor list in the privacy notice, sign DPAs/sub-processor terms, log the consent event, keep egress consent-gated and per-document, and record all of this in the NDPA records of processing.
+  Recommendation: pursue ZDR (or no-retention OCR) as a Phase-3 blocking item; until signed, ship the *accurate-disclosure* wording rather than the absolute claim. Owner: founder; due Phase 3 exit.
 
 ### 6.4 Tier 1 — local analysis
 
-- Map-reduce over page chunks with the 3B model: per-chunk extraction (obligations, dates, unusual clauses) → merge pass → verdict heuristic (any `serious` red flag ⇒ at least `review_before_signing`; verdict can only be escalated by the merge step, never relaxed).
+- Map-reduce over page chunks with the on-device **SLM** (DECISIONS.md #3): per-chunk extraction (obligations, dates, unusual clauses) → merge pass → verdict heuristic (any `serious` red flag ⇒ at least `review_before_signing`; verdict can only be escalated by the merge step, never relaxed).
 - GBNF grammar constrains output to the §6.2 schema.
-- A visible "analysed on-device — results may be less detailed" note when Tier 1 was chosen over an offered Tier 2 (per REQ-CONTRACT-005).
-- 30s target on 10 pages (NFR-PERF-004): benchmark on a 2022 mid-range Android in Phase 3 week 1; if missed, reduce Tier-1 page ceiling and route the remainder to Tier 2 with consent — set this expectation in UI (risk register: on-device quality).
+- A visible "analysed on-device — results may be less detailed" note when Tier 1 was chosen over an offered Tier 2 (per REQ-CONTRACT-005). The SLM trades some depth for fitting low-RAM devices; users who want maximum depth choose the cloud LLM.
+- 30s target on 10 pages (NFR-PERF-004): benchmark in the **week-1 device test** (PLAN Phase 0) on a representative low/mid-range Android; if missed, reduce the Tier-1 page ceiling or, if the SLM can't deliver acceptable quality at all, ship **cloud-LLM-only ContractScan** for MVP and drop on-device analysis (DECISIONS.md #8) — set this expectation in UI.
 
 ---
 
@@ -393,17 +401,20 @@ Implementation notes:
 | ADR-004 | Tier-2 via server proxy, never direct from device | API key protection, usage metering, single egress chokepoint for consent enforcement |
 | ADR-005 | Backup = opaque encrypted blobs + manifest, not row-level sync | Zero-knowledge requirement rules out server-readable rows; full sync is explicitly Phase 2 |
 | ADR-006 | Claude model ID is config, default `claude-sonnet-4-6` per PRD | Allows Opus 4.8 A/B for red-flag recall without an app release |
-| ADR-007 | Password-derived KEK means backups unrecoverable on password loss | Direct consequence of NFR-SEC-003; mitigated by recovery-phrase option considered for Phase 2 |
+| ADR-007 | Password-derived KEK; **recovery phrase shipped in MVP** (not Phase 2) | NFR-SEC-003 forbids server-held keys, but "forgot password = lost backup" is unacceptable for this persona. Recovery phrase / encrypted recovery kit re-derives the key client-side, preserving zero-knowledge (DECISIONS.md #2) |
+| ADR-010 | Optional opt-in encrypted backup (≤5 GB) on the **free tier** | Core promise can't hold only for paying users; closes the device-loss reputational gap while keeping local-first the default (DECISIONS.md #1) |
+| ADR-011 | On-device analysis uses an **SLM**, cloud uses an **LLM**, user chooses; 3B on-device model dropped | 3B needs ~2 GB RAM; market skews to 2–4 GB-RAM devices, which would silently route everyone to cloud. SLM fits the hardware; cloud LLM stays available for depth (DECISIONS.md #3) |
 | ADR-008 | Per-doc-type reminder policies with "effective expiry" instead of a flat T-90/30/7/0 schedule | A passport with <6 months validity is already unusable for most international travel; flat schedules notify after the real deadline has passed. Policy table is versioned remote JSON; flat schedule remains the default for unknown types |
 | ADR-009 | Compliance targets NDPA 2023, not NDPR 2019 | PRD cites the superseded regulation; building consent/records against NDPR means redoing the work |
 
 ---
 
-## 11. Open Questions (resolve before/with the user)
+## 11. Open Questions
 
-1. **SMS OTP provider for Nigerian numbers** (Termii vs Twilio) — cost and deliverability differ materially in-market; REQ-AUTH-004 needs one in Phase 0.
-2. **Anthropic ZDR / retention agreement** — see §6.3; the consent copy depends on it.
-3. **Recovery story for zero-knowledge backups** — accept "password loss = backup loss" for MVP, or add an optional recovery phrase (extra scope)?
-4. **Family tier in MVP billing?** PRD prices it but defers Family *Profiles* — recommend selling Personal only at launch and waitlisting Family to avoid building entitlements for an unbuilt feature.
-5. **Free-tier safety net for device loss.** The MVP's core promise ("never lose documents at critical moments") only holds for paid users who enabled backup; a stolen phone wipes a free user's vault entirely. Options: (a) a small free encrypted-backup allowance (e.g. 10 documents), (b) aggressive local-export nudges ("email yourself an encrypted archive"), (c) accept the gap and message it honestly. Recommend (a) — it converts the product's biggest reputational risk into an upgrade funnel.
-6. **Tier-1 ContractScan viability on market hardware.** Llama 3.2 3B needs ~2GB free RAM; the market skews to 2–4GB-total devices. If the week-1 device spike (see plan) fails, ship Tier 2-only ContractScan for MVP — it still validates all three hypotheses and removes the largest engineering line item from the 16-week solo schedule.
+**Most of the original open questions are now resolved — see `docs/DECISIONS.md` for the founder decisions (issues #1–#8 + nits).** In short: free-tier 5 GB backup (DECISIONS #1, ADR-010); recovery phrase in MVP (#2, ADR-007); SLM-local/LLM-cloud (#3, ADR-011); validation measures docs-under-management + reminders-acted-on (#4); validate at the real price (#5); NDPA 2023 (#6, ADR-009); retention best-practice posture (#7, §6.3); Personal-only launch, Family waitlisted (nit B).
+
+Still genuinely open:
+
+1. **SMS OTP provider for Nigerian numbers** (Termii vs Twilio) — cost and deliverability differ materially in-market; REQ-AUTH-004 needs one in Phase 0, week 1.
+2. **Exact on-device SLM** — config value fixed by the week-1 device test (DECISIONS #3/#8); 1B-class candidate, sub-1B fallback.
+3. **ZDR / no-retention OCR contracts** — in progress per §6.3 and DECISIONS #7; blocks only the absolute-deletion consent copy (accurate-disclosure copy ships in the meantime).

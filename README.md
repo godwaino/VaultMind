@@ -19,6 +19,7 @@
 | `VaultMind_PRD_v1.0.docx` | Product Requirements Document (source of truth for scope) |
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | System architecture: local-first design, zero-knowledge encryption, AI pipeline (Tesseract / Llama 3.2 / Claude API), data model, security, ADRs |
 | [`docs/IMPLEMENTATION_PLAN.md`](docs/IMPLEMENTATION_PLAN.md) | 16-week phased build plan mapped to PRD phases, with exit criteria, risk burn-down, and metric instrumentation |
+| [`docs/DECISIONS.md`](docs/DECISIONS.md) | Decision log resolving the PR-review risks & open questions: free-tier backup, recovery phrase, SLM/LLM split, NDPA 2023, third-party retention posture, pricing, scope |
 
 ## Stack (summary)
 
