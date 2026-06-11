@@ -191,7 +191,22 @@ Notably absent server-side: document text, OCR output, categories, expiry dates,
 
 ### 4.3 Reminders & notifications (ExpiryGuard)
 
-- **Primary = local notifications**, scheduled on-device via Expo Notifications at upload/edit time for each tracked document at T-90/T-30/T-7/T-0 (REQ-EXPIRY-005). Works fully offline (REQ-EXPIRY-009). Rescheduled on date edit, dismissal handling per REQ-EXPIRY-008 (dismiss one, keep the rest).
+- **Primary = local notifications**, scheduled on-device via Expo Notifications at upload/edit time for each tracked document (REQ-EXPIRY-005). Works fully offline (REQ-EXPIRY-009). Rescheduled on date edit, dismissal handling per REQ-EXPIRY-008 (dismiss one, keep the rest).
+- **Per-document-type reminder policies with "effective expiry".** The PRD's flat T-90/30/7/0 schedule fires too late for documents whose *usable* life ends before the printed date. Canonical example: most countries enforce a 6-month passport-validity rule, and NIS renewals take weeks — a passport with 2 months left is already unusable for international travel, and the holder is forced into costly fast-track renewal. Each tracked type therefore carries a policy:
+
+  | Doc type | Effective expiry | Reminder schedule (before *effective* expiry) | Rationale |
+  |---|---|---|---|
+  | International Passport | printed − 6 months | 6m, 3m, 1m, 7d, day-of | 6-month validity rule + NIS renewal lead time |
+  | Visa / Work Permit | printed date | 90/30/7/0 + renewal-window note per visa class | Some classes must renew before a window closes |
+  | Driver's / Vehicle Licence | printed date | 60/30/7/0 | FRSC renewal is days-to-weeks |
+  | Insurance Policies | printed date | 30/14/7/0 | Lapse = void cover; renewal is fast |
+  | Professional Certificates | printed date | 90/30/7/0 | CPD requirements may need months of lead |
+  | Tenancy Agreements | printed date | 90/60/30/0 | Notice periods are typically 1–3 months |
+  | WAEC/NECO Attestation | printed date | 90/30/7/0 | Default |
+
+  Policies live in the same versioned, remotely-updatable JSON as the renewal-guidance content; the T-90/30/7/0 default remains for unknown/manual types, satisfying REQ-EXPIRY-005 as the floor while fixing its passport blind spot. Reminder copy names the effective deadline explicitly ("Your passport must be renewed by March for travel after September").
+- **Travel-readiness check (lightweight, high-leverage).** A single action — "I'm travelling on ⟨date⟩ to ⟨region⟩" — that evaluates every travel-relevant tracked document (passport effective validity, visa, vaccination card) against the trip date and flags failures *now* rather than at the next scheduled reminder. Pure client-side computation over data ExpiryGuard already holds; no new data collection. This is the feature that would have caught the 2-months-left passport a year early.
+- **Correction to PRD doc-type list:** the NIN is permanent and the Voter's Card (PVC) does not expire — both are removed from expiry *tracking* (they remain vault categories). The supported-type list should get a pass from someone who processes these documents daily.
 - **Secondary = email** via Resend (REQ-EXPIRY-006). Because the server doesn't know expiry dates (data minimisation), email reminders work by the *device* registering a minimal reminder record server-side **only if the user opts in to email reminders**: `(user_id, doc_label_chosen_by_user, fire_at)` — the label is user-visible text, not OCR content. A Vercel cron sweeps due rows daily. This is an explicit, documented trade-off; default off.
 - Urgency dashboard colour bands (REQ-EXPIRY-011) and renewal guidance content (REQ-EXPIRY-014) are pure client concerns; guidance is a versioned static JSON (per doc type: steps + authority + URL) bundled with the app and remotely updatable via CDN fetch (non-sensitive).
 
@@ -348,7 +363,9 @@ Implementation notes:
 
 ---
 
-## 8. NDPR / Privacy Engineering
+## 8. NDPA / Privacy Engineering
+
+> **Compliance target correction:** the PRD cites "NDPR 2019 from day one", but Nigeria's operative regime is the **Nigeria Data Protection Act (NDPA) 2023** with the NDPC as regulator — different registration, breach-notification, and DPO requirements. All consent, records-of-processing, and notice work below targets the NDPA (with NDPR-era guidance where the NDPC has carried it forward).
 
 - **Consent Centre** screen: granular toggles for (a) core processing, (b) optional analytics, (c) cloud OCR fallback, (d) cloud backup, (e) Tier-2 AI — each with plain-English copy (REQ-ONB-002/003); every change appends to `consent_events`.
 - **Analytics:** opt-in only, event names only (no document content, no OCR text — NFR-SEC-006). Recommend PostHog EU/self-host or Vercel Analytics.
@@ -377,6 +394,8 @@ Implementation notes:
 | ADR-005 | Backup = opaque encrypted blobs + manifest, not row-level sync | Zero-knowledge requirement rules out server-readable rows; full sync is explicitly Phase 2 |
 | ADR-006 | Claude model ID is config, default `claude-sonnet-4-6` per PRD | Allows Opus 4.8 A/B for red-flag recall without an app release |
 | ADR-007 | Password-derived KEK means backups unrecoverable on password loss | Direct consequence of NFR-SEC-003; mitigated by recovery-phrase option considered for Phase 2 |
+| ADR-008 | Per-doc-type reminder policies with "effective expiry" instead of a flat T-90/30/7/0 schedule | A passport with <6 months validity is already unusable for most international travel; flat schedules notify after the real deadline has passed. Policy table is versioned remote JSON; flat schedule remains the default for unknown types |
+| ADR-009 | Compliance targets NDPA 2023, not NDPR 2019 | PRD cites the superseded regulation; building consent/records against NDPR means redoing the work |
 
 ---
 
@@ -386,3 +405,5 @@ Implementation notes:
 2. **Anthropic ZDR / retention agreement** — see §6.3; the consent copy depends on it.
 3. **Recovery story for zero-knowledge backups** — accept "password loss = backup loss" for MVP, or add an optional recovery phrase (extra scope)?
 4. **Family tier in MVP billing?** PRD prices it but defers Family *Profiles* — recommend selling Personal only at launch and waitlisting Family to avoid building entitlements for an unbuilt feature.
+5. **Free-tier safety net for device loss.** The MVP's core promise ("never lose documents at critical moments") only holds for paid users who enabled backup; a stolen phone wipes a free user's vault entirely. Options: (a) a small free encrypted-backup allowance (e.g. 10 documents), (b) aggressive local-export nudges ("email yourself an encrypted archive"), (c) accept the gap and message it honestly. Recommend (a) — it converts the product's biggest reputational risk into an upgrade funnel.
+6. **Tier-1 ContractScan viability on market hardware.** Llama 3.2 3B needs ~2GB free RAM; the market skews to 2–4GB-total devices. If the week-1 device spike (see plan) fails, ship Tier 2-only ContractScan for MVP — it still validates all three hypotheses and removes the largest engineering line item from the 16-week solo schedule.

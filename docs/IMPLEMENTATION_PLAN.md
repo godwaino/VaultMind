@@ -37,12 +37,14 @@ Deliverable that carries forward: the waitlist becomes the Early Access invite p
 4. **Encryption layer (`packages/crypto`)**
    - LMK generation + Keychain/Keystore storage; AES-256-GCM file envelope (encrypt/decrypt streams); encrypted SQLite bring-up; Argon2id KDF for the backup KEK (function only — backup itself lands later).
    - Unit-test vectors + a tamper test (GCM auth-tag failure must surface).
-5. **NDPR groundwork**
+5. **NDPA groundwork** (NDPA 2023 — not the superseded NDPR 2019 the PRD cites; see ARCHITECTURE §8/ADR-009)
    - Privacy notice drafted and published (PRD Phase 0 deliverable).
    - Onboarding flow (≤3 screens, REQ-ONB-001..004): value prop → plain-English privacy summary → granular consent toggles → optional first-upload prompt with empty-state dashboard.
    - `packages/consent` with `ConsentToken` enforcement and `consent_events` writes.
 
-**Phase 0 risks to burn down early:** SMS deliverability in Nigeria (test with real numbers week 2); encrypted-SQLite performance on low-end Android.
+**Phase 0 risks to burn down early:**
+- SMS deliverability in Nigeria (test with real numbers week 2); encrypted-SQLite performance on low-end Android.
+- **Week-1 device spike (moved up from Phase 3):** Llama 3.2 3B Q4 via llama.rn on a representative low/mid-range device (e.g. 4GB-RAM Tecno/Infinix) — load time, RAM headroom, 10-page analysis latency. If it fails, descope Tier-1 ContractScan to Tier-2-only for MVP *now*, before the architecture hardens around it (ARCHITECTURE open question §11.6). This also de-risks the 16-week solo schedule.
 
 ---
 
@@ -79,11 +81,13 @@ Deliverable that carries forward: the waitlist becomes the Early Access invite p
 **Exit criteria (PRD):** push notification 30 days before a tracked document expires.
 
 ### Week 8 — extraction & tracking
-- Expiry-date detection wired into the ingestion pipeline for the 11 supported doc types (REQ-EXPIRY-002); confidence threshold → manual entry required (REQ-EXPIRY-003); edit/override UI (REQ-EXPIRY-004).
+- Expiry-date detection wired into the ingestion pipeline for the supported doc types (REQ-EXPIRY-002, **minus NIN and Voter's Card — neither expires**; they stay as vault categories only); confidence threshold → manual entry required (REQ-EXPIRY-003); edit/override UI (REQ-EXPIRY-004).
 - Free-tier cap: 5 tracked documents (monetisation table).
 
 ### Week 9 — reminder engine
-- Local scheduling at T-90/30/7/0 via Expo Notifications; personalised copy (REQ-EXPIRY-007); dismiss-one-keep-rest semantics (REQ-EXPIRY-008); reschedule on edit; fully offline (REQ-EXPIRY-009).
+- **Per-doc-type reminder policies with effective expiry** (ARCHITECTURE §4.3, ADR-008): passports remind from 6 months *before the 6-month-validity cutoff* (i.e. 12 months before printed expiry); flat T-90/30/7/0 remains the default for unknown/manual types (REQ-EXPIRY-005 as floor). Policy table ships as versioned remote JSON alongside renewal guidance.
+- Local scheduling via Expo Notifications; personalised copy naming the *effective* deadline (REQ-EXPIRY-007); dismiss-one-keep-rest semantics (REQ-EXPIRY-008); reschedule on edit; fully offline (REQ-EXPIRY-009).
+- **Travel-readiness check:** "I'm travelling on ⟨date⟩" → evaluate passport effective validity, visas, and other travel docs against the trip date; flag failures immediately. Client-side only, ~1–2 days of work on top of the policy engine, and it's the strongest demo moment in the product (catches the "passport expires in 2 months, trip is next week" scenario a year early).
 - Opt-in email secondary channel: minimal `(label, fire_at)` registration + Vercel cron + Resend template (ARCHITECTURE §4.3 trade-off).
 - Time-travel test harness (fake clock) for the schedule matrix.
 
@@ -99,7 +103,7 @@ Deliverable that carries forward: the waitlist becomes the Early Access invite p
 
 ### Week 11 — upload flow + Tier 1 spike
 - Dedicated ContractScan upload UI (separate from vault flow) with the "what this does" explainer (REQ-CONTRACT-001..003).
-- **Spike (timeboxed 3 days):** Llama 3.2 3B Q4 on a 2022 mid-range Android — 10-page analysis ≤30s? RAM headroom? → sets the Tier-1 device gate and page ceiling (NFR-PERF-004, risk register).
+- **Tier-1 go/no-go (informed by the week-1 device spike):** confirm the 3B-model device gate and page ceiling on current builds (NFR-PERF-004); if the week-1 spike already failed, this week becomes Tier-2 polish instead.
 - Shared result schema + encrypted result persistence to vault (REQ-CONTRACT-010).
 
 ### Week 12 — Tier 1 local analysis
