@@ -9,6 +9,7 @@
 ## Week -2 to 0 — Pre-build validation (PRD §11.1, mandatory)
 
 - [ ] Single-page landing site (can reuse the `backend/` Next.js app on Vercel): value prop for Smart Vault / ExpiryGuard / ContractScan, waitlist form with the three qualifying questions.
+- [ ] **Price the willingness-to-pay question at ₦3,500/month** — the actual Personal launch price, not the ₦1,500 early-access rate. Validating against a discount inflates the signal; the early-access price then becomes a genuine launch lever instead of a baked-in assumption.
 - [ ] Drive ~200 targeted visits (LinkedIn, professional WhatsApp groups).
 - [ ] **Gate:** ≥40 sign-ups and ≥15 willing-to-pay → proceed. Otherwise stop and revisit positioning.
 
@@ -44,7 +45,7 @@ Deliverable that carries forward: the waitlist becomes the Early Access invite p
 
 **Phase 0 risks to burn down early:**
 - SMS deliverability in Nigeria (test with real numbers week 2); encrypted-SQLite performance on low-end Android.
-- **Week-1 device spike (moved up from Phase 3):** Llama 3.2 3B Q4 via llama.rn on a representative low/mid-range device (e.g. 4GB-RAM Tecno/Infinix) — load time, RAM headroom, 10-page analysis latency. If it fails, descope Tier-1 ContractScan to Tier-2-only for MVP *now*, before the architecture hardens around it (ARCHITECTURE open question §11.6). This also de-risks the 16-week solo schedule.
+- **Week-1 SLM device spike (moved up from Phase 3):** Phi-3.5 Mini 3.8B Q4 *and* Gemma 2 2B Q4 via llama.rn on a representative low/mid-range device (e.g. 4GB-RAM Tecno/Infinix) — load time, RAM headroom, 10-page analysis latency (ARCHITECTURE §3.5 model-selection ladder). The SLM strategy (ADR-010) gives two fallback rungs before descoping: if Phi-3.5 misses, Gemma 2 2B in "summary-only" mode; if both miss, Tier-1 ContractScan goes Tier-2-only for MVP *now*, before the architecture hardens around it. This also de-risks the 16-week solo schedule.
 
 ---
 
@@ -72,7 +73,7 @@ Deliverable that carries forward: the waitlist becomes the Early Access invite p
 - Free-tier 50-doc cap with upgrade prompt (REQ-VAULT-022).
 - Document dashboard UI polish; 3-taps-to-anything audit (NFR-UX-001).
 
-*(Cloud backup — REQ-VAULT-023..027 — is paid-tier; implement the client+server flow in Phase 4 alongside Paystack, since entitlements gate it.)*
+*(Cloud backup — REQ-VAULT-023..027 plus the free-tier 5 GB allowance (ADR-011) — lands in Phase 4 alongside Paystack, since entitlements gate the quota.)*
 
 ---
 
@@ -87,6 +88,7 @@ Deliverable that carries forward: the waitlist becomes the Early Access invite p
 ### Week 9 — reminder engine
 - **Per-doc-type reminder policies with effective expiry** (ARCHITECTURE §4.3, ADR-008): passports remind from 6 months *before the 6-month-validity cutoff* (i.e. 12 months before printed expiry); flat T-90/30/7/0 remains the default for unknown/manual types (REQ-EXPIRY-005 as floor). Policy table ships as versioned remote JSON alongside renewal guidance.
 - Local scheduling via Expo Notifications; personalised copy naming the *effective* deadline (REQ-EXPIRY-007); dismiss-one-keep-rest semantics (REQ-EXPIRY-008); reschedule on edit; fully offline (REQ-EXPIRY-009).
+- **Validation mode — fire reminders early during MVP/beta:** a remote-config flag shifts every reminder one band earlier than the policy table (e.g. the 30-day reminder fires at ~45 days) so the 90-day validation window actually observes reminders firing, renewal actions, and dismissal behaviour rather than waiting out real expiry timelines. Copy stays honest about the real deadline; the flag is removed (or defaults off) at GA.
 - **Travel-readiness check:** "I'm travelling on ⟨date⟩" → evaluate passport effective validity, visas, and other travel docs against the trip date; flag failures immediately. Client-side only, ~1–2 days of work on top of the policy engine, and it's the strongest demo moment in the product (catches the "passport expires in 2 months, trip is next week" scenario a year early).
 - Opt-in email secondary channel: minimal `(label, fire_at)` registration + Vercel cron + Resend template (ARCHITECTURE §4.3 trade-off).
 - Time-travel test harness (fake clock) for the schedule matrix.
@@ -103,7 +105,8 @@ Deliverable that carries forward: the waitlist becomes the Early Access invite p
 
 ### Week 11 — upload flow + Tier 1 spike
 - Dedicated ContractScan upload UI (separate from vault flow) with the "what this does" explainer (REQ-CONTRACT-001..003).
-- **Tier-1 go/no-go (informed by the week-1 device spike):** confirm the 3B-model device gate and page ceiling on current builds (NFR-PERF-004); if the week-1 spike already failed, this week becomes Tier-2 polish instead.
+- **Tier-1 go/no-go (informed by the week-1 SLM spike):** confirm the Phi-3.5/Gemma model-selection ladder (ARCHITECTURE §3.5) and page ceiling on current builds (NFR-PERF-004); if the week-1 spike already failed both rungs, this week becomes Tier-2 polish instead.
+- **Processing-preference setting:** Settings → Document Analysis (Local SLM / Cloud LLM / Ask each time, ARCHITECTURE §6.1) — the routing layer reads it from Week 12 onwards.
 - Shared result schema + encrypted result persistence to vault (REQ-CONTRACT-010).
 
 ### Week 12 — Tier 1 local analysis
@@ -113,7 +116,7 @@ Deliverable that carries forward: the waitlist becomes the Early Access invite p
 ### Week 13 — Tier 2 Claude integration
 - `/api/contractscan/analyze` per ARCHITECTURE §6.3: consent-token check, entitlement + 2/month counter (REQ-CONTRACT-012..014), in-memory handling, `@anthropic-ai/sdk` with `claude-sonnet-4-6` (config-driven), prompt-cached system prompt, PDF/image document blocks, structured outputs against the shared schema, SSE streaming to the app, typed error mapping (429/529/refusal/max_tokens).
 - Non-dismissable consent gate with exact PRD copy + "Analyse Locally Only" branch (REQ-CONTRACT-005).
-- **Compliance task (blocking exit):** Anthropic retention/ZDR arrangement or consent-copy alignment (ARCHITECTURE §6.3).
+- **Compliance task (blocking exit):** execute the §6.3 third-party retention playbook — sign Anthropic DPA + enable ZDR; sign Google Cloud DPA + disable Vision logging; align consent-screen copy with whichever outcome is contractually true; record both DPAs in the NDPA records of processing.
 - Run both tiers against the eval set; if Sonnet red-flag recall disappoints, A/B `claude-opus-4-8` via config.
 
 ### Week 14 — results UX + hardening
@@ -126,8 +129,9 @@ Deliverable that carries forward: the waitlist becomes the Early Access invite p
 
 **Exit criteria (PRD):** store approvals, payment flow E2E, 20 internal beta users onboarded.
 
-- **Paystack** (week 15): plans (Personal ₦3,500 / early-access ₦1,500 lock; defer Family per open question §11.4 of ARCHITECTURE), init/verify, webhook → entitlements, offline entitlement claim, upgrade/cancel flows; E2E test with real cards/bank transfer/USSD.
-- **Cloud backup** (paid feature, now gated correctly): consent screen per REQ-VAULT-024, client-side encrypt → signed-URL upload, manifest versioning, restore flow, disable + remote-wipe (REQ-VAULT-023..027). Surface the "password loss = backup loss" warning.
+- **Paystack** (week 15): plans (Personal ₦3,500 / early-access ₦1,500 lock; defer Family per open question §11.2 of ARCHITECTURE), init/verify, webhook → entitlements, offline entitlement claim, upgrade/cancel flows; E2E test with real cards/bank transfer/USSD.
+- **Cloud backup** (free tier: opt-in 5 GB; paid: full vault — ADR-011): consent screen per REQ-VAULT-024, client-side encrypt → signed-URL upload, manifest versioning, restore flow, disable + remote-wipe (REQ-VAULT-023..027); server-side 5 GB quota check at signed-URL issuance with approaching-quota upgrade prompt.
+- **Recovery phrase** (ADR-007): 12-word BIP39 generation at backup enable, show-once UX with confirmation quiz (re-enter 3 random words), Argon2id derivation path to the same KEK, restore-with-phrase flow. Test the full lose-password → recover-with-phrase journey on the device matrix.
 - **Data export & erasure:** local export (PDF/JSON), server export endpoint, one-tap account deletion with 24h/72h purge jobs (NFR-SEC-007/008).
 - **Penetration test:** external vendor, scope per ARCHITECTURE §5; remediate critical/high before submission (NFR-SEC-010). Book the vendor in **week 11** — lead times are long.
 - **Store submissions:** iOS build submitted **start of week 15** (2-week buffer per risk register); encryption export compliance (standard-encryption exemption docs); Play Store data-safety form aligned with the privacy notice; ASO copy (keywords: "document organiser Nigeria", "contract reader app").
@@ -159,4 +163,4 @@ Deliverable that carries forward: the waitlist becomes the Early Access invite p
 | Store rating 4.2+ / NPS 40+ | Store consoles / in-app survey (post-3rd-session) |
 | Critical security incidents (0) | `audit_log` + Sentry alerts |
 
-Note: several metrics depend on **opt-in** analytics (NDPR posture). Expect undercounting; treat analytics-derived numbers as floors and say so in the validation review.
+Note: several metrics depend on **opt-in** analytics (NDPA posture). Expect undercounting; treat analytics-derived numbers as floors and say so in the validation review.
