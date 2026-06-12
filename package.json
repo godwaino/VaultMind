@@ -9,7 +9,7 @@
     "apps/*"
   ],
   "scripts": {
-    "typecheck": "tsc -b --pretty",
+    "typecheck": "tsc -b --pretty && tsc --noEmit -p backend",
     "test": "NODE_OPTIONS=--experimental-sqlite vitest run",
     "test:watch": "NODE_OPTIONS=--experimental-sqlite vitest",
     "lint": "echo \"(eslint config lands with the Expo app in Phase 1)\""
