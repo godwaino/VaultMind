@@ -20,6 +20,33 @@
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | System architecture: local-first design, zero-knowledge encryption, AI pipeline (Tesseract / Llama 3.2 / Claude API), data model, security, ADRs |
 | [`docs/IMPLEMENTATION_PLAN.md`](docs/IMPLEMENTATION_PLAN.md) | 16-week phased build plan mapped to PRD phases, with exit criteria, risk burn-down, and metric instrumentation |
 | [`docs/DECISIONS.md`](docs/DECISIONS.md) | Decision log resolving the PR-review risks & open questions: free-tier backup, recovery phrase, SLM/LLM split, NDPA 2023, third-party retention posture, pricing, scope |
+| [`docs/PHASE0_STATUS.md`](docs/PHASE0_STATUS.md) … [`PHASE4_STATUS.md`](docs/PHASE4_STATUS.md) | Per-phase build status — what's tested vs. stubbed |
+| [`docs/PENTEST_SCOPE.md`](docs/PENTEST_SCOPE.md) | Pre-launch penetration-test scope |
+| [`docs/privacy/PRIVACY_NOTICE.md`](docs/privacy/PRIVACY_NOTICE.md) | NDPA 2023 privacy notice (draft for counsel) |
+
+## Monorepo & build status
+
+npm workspaces (TypeScript). Domain logic is built and unit-tested; native/AI/cloud pieces (Expo UI, Tesseract, the SLM, Supabase, Claude) sit behind injected interfaces with in-memory adapters for tests. **122 tests passing; `tsc -b` clean.**
+
+```bash
+npm install
+npm run typecheck
+npm test          # NODE_OPTIONS=--experimental-sqlite is set by the script (node:sqlite FTS5)
+```
+
+| Package | Responsibility | Phase |
+|---|---|---|
+| `packages/crypto` | AES-256-GCM, Argon2id, zero-knowledge backup keyset + recovery phrase | 0 |
+| `packages/consent` | In-code egress gate (ConsentToken) + NDPA audit events | 0 |
+| `packages/validation` | Email / password / Nigerian-phone validation, session policy | 0 |
+| `packages/vault-core` | Ingestion pipeline, OCR orchestration, dedup, management, free-tier cap | 1 |
+| `packages/search` | Offline FTS5 search, query rewrite, BM25 ranking | 1 |
+| `packages/expiry-core` | Effective-expiry reminder policies, travel-readiness, urgency, guidance | 2 |
+| `packages/contractscan-core` | Shared result schema, tier routing, verdict rules, Tier-1 SLM analysis | 3 |
+| `packages/backup-core` | Client-side encrypted backup, restore, manifest, remote wipe | 4 |
+| `backend/` | Next.js route logic: auth, ContractScan Tier-2 proxy, Paystack, account | 0–4 |
+| `supabase/` | Schema migrations + RLS + storage policies | 0 |
+| `apps/mobile/` | Expo app (structural stub) | 0+ |
 
 ## Stack (summary)
 

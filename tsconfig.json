@@ -1,0 +1,14 @@
+{
+  "files": [],
+  "references": [
+    { "path": "./packages/crypto" },
+    { "path": "./packages/consent" },
+    { "path": "./packages/validation" },
+    { "path": "./packages/vault-core" },
+    { "path": "./packages/search" },
+    { "path": "./packages/expiry-core" },
+    { "path": "./packages/contractscan-core" },
+    { "path": "./packages/backup-core" },
+    { "path": "./backend" }
+  ]
+}

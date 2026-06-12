@@ -1,0 +1,35 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Unit tests
+        run: npm test
+        env:
+          # node:sqlite (used by @vaultmind/search FTS5) is still experimental in Node 22
+          NODE_OPTIONS: --experimental-sqlite
+
+  # Placeholder gates wired up as their inputs land in later phases:
+  #  - expo-eas-build (dev profile)        -> when apps/mobile is fleshed out (Phase 1)
+  #  - supabase-migration-check            -> when Supabase project secrets are configured
+  #  - vercel-preview-deploy               -> when backend routes are deployed
+  # Branch protection on `main`: require build-and-test + 1 review (solo-dev code-review discipline).

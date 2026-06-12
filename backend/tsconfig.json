@@ -1,0 +1,20 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": ".",
+    "outDir": "./dist",
+    "lib": ["ES2022", "DOM"],
+    "types": ["node"],
+    "paths": {
+      "@vaultmind/validation": ["../packages/validation/src/index.ts"],
+      "@vaultmind/consent": ["../packages/consent/src/index.ts"],
+      "@vaultmind/contractscan-core": ["../packages/contractscan-core/src/index.ts"]
+    }
+  },
+  "references": [
+    { "path": "../packages/validation" },
+    { "path": "../packages/consent" },
+    { "path": "../packages/contractscan-core" }
+  ],
+  "include": ["lib/**/*", "app/**/*"]
+}
