@@ -1,0 +1,17 @@
+{
+  "name": "@vaultmind/mobile",
+  "version": "0.0.0",
+  "private": true,
+  "main": "expo-router/entry",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo run:android",
+    "ios": "expo run:ios"
+  },
+  "//deps": "Real dependencies (expo, expo-router, react, react-native, llama.rn, react-native-tesseract-ocr, expo-sqlite, react-native-encrypted-storage, react-native-get-random-values) are installed on a dev machine with the native toolchain. This package is a STRUCTURAL stub for Phase 0 — see docs/PHASE0_STATUS.md.",
+  "dependencies": {
+    "@vaultmind/crypto": "*",
+    "@vaultmind/consent": "*",
+    "@vaultmind/validation": "*"
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "name": "@vaultmind/backend",
+  "version": "0.0.0",
+  "type": "module",
+  "private": true,
+  "dependencies": {
+    "@vaultmind/validation": "*",
+    "@vaultmind/consent": "*",
+    "@vaultmind/contractscan-core": "*"
+  },
+  "//": "Next.js + @supabase/supabase-js are added when the app is deployed to Vercel. Route handlers here use the web-standard Request/Response API so the core logic stays framework-agnostic and unit-testable."
+}
