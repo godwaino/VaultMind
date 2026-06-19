@@ -7,6 +7,7 @@ type ApiResult = { status: number; body: unknown };
 export default function Home() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [phone, setPhone] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<ApiResult | null>(null);
 
@@ -18,7 +19,7 @@ export default function Home() {
       const res = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email, password, phone }),
       });
       const body = await res.json().catch(() => ({ error: "non-JSON response" }));
       setResult({ status: res.status, body });
@@ -61,6 +62,17 @@ export default function Home() {
             onChange={(e) => setPassword(e.target.value)}
             required
             minLength={8}
+            style={inputStyle}
+          />
+        </label>
+        <label style={{ display: "grid", gap: 4 }}>
+          <span style={{ fontSize: 13, color: "#9b9ba3" }}>Phone</span>
+          <input
+            type="tel"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            required
+            placeholder="0803 123 4567"
             style={inputStyle}
           />
         </label>
