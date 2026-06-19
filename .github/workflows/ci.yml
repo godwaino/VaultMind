@@ -17,7 +17,9 @@ jobs:
           cache: npm
 
       - name: Install
-        run: npm ci
+        # Use `npm install` (not `npm ci`) so the workflow tolerates lockfile
+        # drift while phase-by-phase deps land. Vercel's build does the same.
+        run: npm install --no-audit --no-fund --no-progress
 
       - name: Typecheck
         run: npm run typecheck
