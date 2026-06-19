@@ -9,6 +9,7 @@
     "start": "next start"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.45.0",
     "@vaultmind/consent": "*",
     "@vaultmind/contractscan-core": "*",
     "@vaultmind/validation": "*",
@@ -16,7 +17,6 @@
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },
-  "//": "@supabase/supabase-js is added when the Supabase project is provisioned. Route handlers use the web-standard Request/Response API so the core logic stays framework-agnostic and unit-testable.",
   "devDependencies": {
     "@types/node": "^22.10.0",
     "@types/react": "19.2.17",
