@@ -1,9 +1,10 @@
 /**
  * Shared ContractScan result schema (ARCHITECTURE §6.2). BOTH tiers — on-device SLM
- * (Tier 1) and cloud Claude (Tier 2) — emit this exact shape, so the results screen
- * is identical regardless of where analysis ran (REQ-CONTRACT-006/007/008). Tier 2
- * uses it as the Claude `output_config` JSON schema; Tier 1 constrains its SLM with
- * a GBNF grammar built from the same shape. We still validate at runtime.
+ * (Tier 1) and the cloud model — Gemini (Tier 2) — emit this exact shape, so the
+ * results screen is identical regardless of where analysis ran (REQ-CONTRACT-006/
+ * 007/008). Tier 2 uses it as the Gemini `responseSchema` (structured output); Tier
+ * 1 constrains its SLM with a GBNF grammar built from the same shape. We still
+ * validate at runtime.
  */
 
 export type Severity = "note" | "caution" | "serious";
@@ -39,7 +40,7 @@ export interface ContractAnalysis {
   verdict: Verdict;
 }
 
-/** JSON Schema passed to Claude `output_config.format` for guaranteed-valid JSON. */
+/** JSON Schema passed to Gemini as `responseSchema` for guaranteed-valid JSON. */
 export const CONTRACT_ANALYSIS_SCHEMA = {
   type: "object",
   properties: {

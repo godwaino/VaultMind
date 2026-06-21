@@ -2,12 +2,13 @@
  * Tier-2 ContractScan analysis — server-side proxy logic (ARCHITECTURE §6.3,
  * REQ-CONTRACT-005/012). Framework-agnostic and fully unit-tested; the Next route
  * is a thin wrapper. Enforces, in order: Tier-2 consent → entitlement/quota →
- * Claude call → schema validation + verdict reconciliation. Nothing about the
+ * cloud-model call → schema validation + verdict reconciliation. Nothing about the
  * document is persisted or logged; only a usage increment and a content-free audit.
+ * The cloud model (Gemini) sits behind the provider-neutral CloudContractAnalyzer port.
  */
 
 import { validateAnalysis, reconcileVerdict, type ContractAnalysis } from "@vaultmind/contractscan-core";
-import type { AuditLog, ClaudeClient, EntitlementStore, UsageCounter } from "./ports.js";
+import type { AuditLog, CloudContractAnalyzer, EntitlementStore, UsageCounter } from "./ports.js";
 
 /** Free tier: 2 cloud analyses per calendar month (REQ-CONTRACT-012). */
 export const FREE_TIER_MONTHLY_ANALYSES = 2;
@@ -38,7 +39,7 @@ export type AnalyzeResponse =
 export interface AnalyzeDeps {
   entitlements: EntitlementStore;
   usage: UsageCounter;
-  claude: ClaudeClient;
+  analyzer: CloudContractAnalyzer;
   audit: AuditLog;
   now: () => Date;
 }
@@ -69,8 +70,8 @@ export async function handleAnalyze(req: AnalyzeRequest, deps: AnalyzeDeps): Pro
     };
   }
 
-  // 3) call Claude (document held in memory only)
-  const raw = await deps.claude.analyzeContract({
+  // 3) call the cloud model (document held in memory only)
+  const raw = await deps.analyzer.analyzeContract({
     mimeType: req.mimeType,
     base64: req.base64,
     signingParty: req.signingParty,

@@ -1,36 +1,19 @@
 /**
- * POST /api/auth/register  (Next.js App Router route handler)
- *
- * Thin transport layer: parse JSON, delegate to handleRegister, map to HTTP.
- * Uses the web-standard Request/Response API (supported natively by the App
- * Router), so it carries no framework-specific types. The Supabase adapters are
- * constructed here from server-only env vars.
- *
- * NOTE (Phase 0 status): the Supabase adapters below are placeholders — wiring
- * @supabase/supabase-js with the service-role key happens when the project is
- * provisioned. The business logic in ../../../../lib/auth/register.ts is complete
- * and tested.
+ * POST /api/auth/register (Next.js App Router) — REQ-AUTH-001..003.
+ * Returns 501 until Supabase is configured; otherwise uses the real Supabase
+ * adapters (service role). Business logic lives in lib/auth/register.ts (tested).
  */
 
 import { handleRegister, type RegisterRequest } from "../../../../lib/auth/register.js";
-import { DuplicateEmailError, type AuthProvider, type ProfileStore } from "../../../../lib/ports.js";
+import { missingEnv, notConfigured } from "../../../../lib/http.js";
+import { makeAuthProvider, makeProfileStore, supabaseAdmin } from "../../../../lib/adapters/supabase.js";
 
-// --- placeholder adapters; replace with Supabase-backed implementations ---
-const auth: AuthProvider = {
-  async createUser() {
-    throw new Error("Supabase AuthProvider not configured (Phase 0 placeholder)");
-    // Real impl: supabaseAdmin.auth.admin.createUser({ email, password, email_confirm: false })
-    //   -> on 'User already registered' throw new DuplicateEmailError()
-  },
-};
-const profiles: ProfileStore = {
-  async insertProfile() {
-    throw new Error("Supabase ProfileStore not configured (Phase 0 placeholder)");
-  },
-};
-void DuplicateEmailError; // referenced by the real adapter
+const REQUIRED_ENV = ["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"];
 
 export async function POST(request: Request): Promise<Response> {
+  const missing = missingEnv(REQUIRED_ENV);
+  if (missing.length) return notConfigured(`Auth is not configured (missing ${missing.join(", ")}).`);
+
   let body: RegisterRequest;
   try {
     body = (await request.json()) as RegisterRequest;
@@ -38,6 +21,10 @@ export async function POST(request: Request): Promise<Response> {
     return Response.json({ errors: ["Request body must be valid JSON."] }, { status: 400 });
   }
 
-  const result = await handleRegister(body, { auth, profiles });
+  const sb = supabaseAdmin();
+  const result = await handleRegister(body, {
+    auth: makeAuthProvider(sb),
+    profiles: makeProfileStore(sb),
+  });
   return Response.json(result.body, { status: result.status });
 }

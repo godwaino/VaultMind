@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { SearchIndex, rewriteQuery, type SearchDocument } from "./index.js";
+import { nodeSqliteDriver } from "./node-driver.js";
 
 function doc(p: Partial<SearchDocument> & { docId: string }): SearchDocument {
   return {
@@ -29,7 +30,7 @@ describe("rewriteQuery", () => {
 
 describe("SearchIndex (FTS5)", () => {
   let idx: SearchIndex;
-  beforeEach(() => { idx = new SearchIndex(); });
+  beforeEach(() => { idx = new SearchIndex(nodeSqliteDriver); });
   afterEach(() => idx.close());
 
   it("finds a document by a body term", () => {

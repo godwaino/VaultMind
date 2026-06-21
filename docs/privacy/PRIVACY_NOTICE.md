@@ -29,7 +29,7 @@ We do **not** store your document contents, OCR text, categories, expiry dates, 
 Only with your explicit, per-feature consent (you can turn each off at any time in the Consent Centre):
 
 - **Cloud OCR fallback** — if on-device text recognition is unsure, a page may be sent to Google for text extraction, then discarded.
-- **Cloud contract analysis (Tier 2)** — a contract you choose to analyse in the cloud is sent to our AI provider (Anthropic) for analysis.
+- **Cloud contract analysis (Tier 2)** — a contract you choose to analyse in the cloud is sent to our AI provider (Google, via the Gemini API) for analysis. On the paid tier Google does not use it to train their models.
 - **Encrypted backup** — encrypted, unreadable backup files are uploaded to our storage.
 
 These providers are our processors/sub-processors. See §6.
@@ -42,7 +42,7 @@ You can access, correct, delete, or export your data, withdraw consent, and lodg
 
 ## 6. Sub-processors
 - **Supabase** — authentication, database, encrypted-backup storage.
-- **Anthropic (Claude)** — cloud contract analysis (only content you send for Tier-2 analysis).
+- **Google (Gemini API)** — cloud contract analysis (only content you send for Tier-2 analysis).
 - **Google Cloud Vision** — cloud OCR fallback (only pages you send for fallback).
 - **Paystack** — payments.
 - **Resend** — transactional email.

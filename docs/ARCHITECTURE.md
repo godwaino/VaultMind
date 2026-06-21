@@ -49,8 +49,8 @@ Everything below follows from four non-negotiable constraints in the PRD:
 │  /api/billing/* (Paystack) · /api/notify/* (Resend) · /api/account/delete|export  │
 │         │                │                  │                    │                │
 │  ┌──────┴──────┐  ┌──────┴───────┐  ┌───────┴────────┐  ┌────────┴────────┐       │
-│  │ Supabase    │  │ Supabase     │  │ Anthropic      │  │ Google Vision   │       │
-│  │ Auth + PG   │  │ Storage      │  │ Claude API     │  │ API (OCR        │       │
+│  │ Supabase    │  │ Supabase     │  │ Google Gemini  │  │ Google Vision   │       │
+│  │ Auth + PG   │  │ Storage      │  │ API (Tier-2,   │  │ API (OCR        │       │
 │  │ (RLS)       │  │ (encrypted   │  │ (Tier-2,       │  │ fallback,       │       │
 │  │             │  │  backup blobs)│ │  ephemeral)    │  │  ephemeral)     │       │
 │  └─────────────┘  └──────────────┘  └────────────────┘  └─────────────────┘       │
@@ -134,14 +134,14 @@ The pipeline is a resumable job queue (persisted in SQLite) so an app kill mid-O
 
 ### 3.5 On-device AI runtime
 
-**Design rule (decision, DECISIONS.md #3): local = SLM, cloud = LLM, the subscriber chooses.** On-device work runs a *small* language model sized for 2–4 GB-RAM market devices; deeper analysis runs a full LLM (Claude) in the cloud. The user picks: privacy-maximising users stay on the SLM; users who want depth and consent to egress use the cloud LLM (available on the free tier per DECISIONS.md #1). A device that can't run the SLM routes to the cloud LLM with consent — so "your data never leaves your device" stays true for those who choose it, instead of silently failing on low-end hardware.
+**Design rule (decision, DECISIONS.md #3): local = SLM, cloud = LLM, the subscriber chooses.** On-device work runs a *small* language model sized for 2–4 GB-RAM market devices; deeper analysis runs a full LLM (Gemini) in the cloud. The user picks: privacy-maximising users stay on the SLM; users who want depth and consent to egress use the cloud LLM (available on the free tier per DECISIONS.md #1). A device that can't run the SLM routes to the cloud LLM with consent — so "your data never leaves your device" stays true for those who choose it, instead of silently failing on low-end hardware.
 
 | Task | Model | Runtime | Notes |
 |---|---|---|---|
 | OCR | Tesseract | `react-native-tesseract-ocr` | eng traineddata bundled; preprocessing (deskew, binarise) before OCR materially lifts accuracy on phone photos |
 | Classification + metadata extraction | SLM, Llama 3.2 1B (Q4) class | `llama.rn` | Constrained generation (GBNF grammar) to force JSON output for the 6 categories + fields |
 | ContractScan Tier 1 (local) | **SLM** — 1B-class (Llama 3.2 1B Q4) starting candidate, sub-1B fallback if RAM headroom is tight | `llama.rn` | Chunked map-reduce over ≤10 pages, sized to run on 2–4 GB-RAM devices. Model is a **config value fixed by the week-1 device test** (PLAN Phase 0). If a device can't run it, route to the cloud LLM (Tier 2) with consent |
-| ContractScan Tier 2 (cloud) | **LLM** — Claude (see §6.3) | server proxy | Full-depth analysis; consent-gated egress; available on free tier per DECISIONS.md #1 |
+| ContractScan Tier 2 (cloud) | **LLM** — Gemini (see §6.3) | server proxy | Full-depth analysis; consent-gated egress; available on free tier per DECISIONS.md #1 |
 
 Models ship in the app bundle (or first-run download over Wi-Fi to keep store binary small — decision ADR-003). Model updates ride app releases (per risk register). The earlier 3B on-device model is **dropped** in favour of an SLM that fits the actual market hardware (DECISIONS.md #3, ADR-011).
 
@@ -157,7 +157,7 @@ All routes are stateless; Supabase is the only state. Every route enforces: TLS 
 |---|---|
 | `/api/auth/*` | Registration glue (email + Nigerian phone validation), MFA enrolment (TOTP secret provisioning / SMS OTP via provider), session policy (30-min inactivity — NFR-SEC-005, enforced via short-lived JWTs + refresh rotation) |
 | `/api/backup/*` | Signed-URL issuance for encrypted blob upload/download to Supabase Storage; manifest versioning; remote-wipe endpoint (REQ-VAULT-026) |
-| `/api/contractscan/analyze` | Tier-2 proxy to Claude API (see §6). Holds the Anthropic key; the key never ships in the app |
+| `/api/contractscan/analyze` | Tier-2 proxy to the Gemini API (see §6). Holds the Gemini key; the key never ships in the app |
 | `/api/ocr/fallback` | Proxy to Google Vision; processes and returns text; stores nothing |
 | `/api/billing/*` | Paystack init/verify/webhook; entitlement writes |
 | `/api/notify/email` | Resend transactional email (verification, expiry reminders as secondary channel) |
@@ -227,7 +227,7 @@ Notably absent server-side: document text, OCR output, categories, expiry dates,
 | Sessions | 30-min inactivity expiry; access token TTL 15 min + refresh rotation; refresh revoked on logout/password change |
 | Consent enforcement | `consent` package: every egress call site must pass a `ConsentToken` minted only when the flag is granted; lint rule bans direct `fetch` of document content outside `api-client` |
 | Erasure | Crypto-shredding locally; server purge jobs ≤24h/≤72h with completion audit events |
-| Secrets | Anthropic/Google/Paystack/Resend keys only in Vercel env; nothing secret in the app bundle |
+| Secrets | Gemini/Google Vision/Paystack/Resend keys only in Vercel env; nothing secret in the app bundle |
 | Pen test | Pre-launch (Phase 4) scope: API routes, auth flows, backup zero-knowledge claim, mobile storage extraction on rooted device |
 
 ---
@@ -305,53 +305,51 @@ Both tiers emit the **same result schema** (below), saved encrypted to the vault
 
 This maps 1:1 to the six output sections of REQ-CONTRACT-006 and drives the structured results screen (REQ-CONTRACT-007/008) — never a raw text dump.
 
-### 6.3 Tier 2 — Claude API integration (server-side proxy)
+### 6.3 Tier 2 — Gemini API integration (server-side proxy)
 
-The mobile app never talks to Anthropic directly. `/api/contractscan/analyze` (Node, TypeScript, official `@anthropic-ai/sdk`):
+The mobile app never talks to Google directly. `/api/contractscan/analyze` (Node, TypeScript, the unified Google GenAI SDK `@google/genai`) — the provider sits behind the `CloudContractAnalyzer` port, so the model can be swapped without touching the analysis logic:
 
 1. **Verify** JWT, entitlement, and usage counter (free tier: 2/month, REQ-CONTRACT-012); verify the request carries the Tier-2 consent token.
 2. **Receive** the document over TLS as base64 (PDF) or images. Held in memory only — no disk, no object storage, no logging of content.
-3. **Call Claude** and **stream** progress events back to the app (SSE) to satisfy the ≤60s + progress-indicator requirement (NFR-PERF-005).
+3. **Call Gemini** and **stream** progress events back to the app (SSE) to satisfy the ≤60s + progress-indicator requirement (NFR-PERF-005).
 4. **Return** the validated JSON result; the buffer is released. Nothing persisted server-side except a usage-counter increment and a content-free audit event.
 
 Request shape:
 
 ```ts
-const stream = client.messages.stream({
-  model: "claude-sonnet-4-6",            // per PRD §6; see model note below
-  max_tokens: 16000,
-  system: [{
-    type: "text",
-    text: CONTRACTSCAN_SYSTEM_PROMPT,    // frozen analysis instructions, Nigerian-law
-    cache_control: { type: "ephemeral" } // context framing, plain-English style guide
-  }],                                    // → prompt-cached across all users' requests
-  messages: [{
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY }); // PAID tier / Vertex
+const stream = await ai.models.generateContentStream({
+  model: process.env.GEMINI_MODEL ?? "gemini-2.5-pro",   // config; see model note below
+  contents: [{
     role: "user",
-    content: [
-      { type: "document", source: { type: "base64", data: pdfBase64 } }, // PDF input
-      { type: "text", text: "Analyse this contract for the signing party named by the user: ..." }
+    parts: [
+      { inlineData: { mimeType: "application/pdf", data: pdfBase64 } }, // PDF/image input
+      { text: "Analyse this contract for the signing party named by the user: ..." }
     ]
   }],
-  output_config: {
-    format: { type: "json_schema", schema: CONTRACT_ANALYSIS_SCHEMA } // §6.2 — guaranteed
-  }                                                                   // valid JSON
+  config: {
+    systemInstruction: CONTRACTSCAN_SYSTEM_PROMPT, // frozen, Nigerian-law framing; cacheable
+    responseMimeType: "application/json",
+    responseSchema: CONTRACT_ANALYSIS_SCHEMA,      // §6.2 — guaranteed valid JSON
+  },
 });
-const message = await stream.finalMessage();
+// accumulate stream, then JSON.parse(final.text) -> validate (handleAnalyze)
 ```
 
 Implementation notes:
 
-- **Model.** The PRD specifies `claude-sonnet-4-6` — a sound cost/latency/quality fit for this workload ($3 in / $15 out per MTok; a 30-page contract ≈ tens of thousands of input tokens, so unit cost stays well inside the ₦3,500/mo price point). If red-flag recall on Nigerian tenancy/loan agreements underperforms during Phase 3 evals, `claude-opus-4-8` ($5/$25) is a drop-in upgrade on the same request shape — make the model ID a config value and A/B it.
-- **Structured outputs** (`output_config.format` with the §6.2 schema) guarantee schema-valid JSON — no parse-retry loops. First request per schema pays a one-time compilation cost; thereafter cached 24h.
-- **Prompt caching** on the system prompt cuts input cost ~90% on the cached span across requests (it's shared by all users; keep it byte-stable — no timestamps or per-user interpolation).
-- **PDF input** is native (document content block, base64). Images (photographed contracts) go as image blocks. The 50-page PRD cap is inside the API's PDF limits.
-- **Streaming** protects against HTTP timeouts on long analyses and feeds the progress UI.
-- **Error handling:** typed SDK exceptions; map 429/529 to a friendly "busy, retrying" state with the SDK's built-in backoff; check `stop_reason` — surface a `refusal` as "this document couldn't be analysed" with the local-only option; `max_tokens` → retry at a higher cap.
-- **Retention / "ephemeral" claim — global best practice (decision, DECISIONS.md #7).** REQ-CONTRACT-005's consent copy promises "processed immediately and permanently deleted — never stored on our servers." On *our* servers that's true (in-memory design above). It is **not ours to promise for Anthropic or Google Vision**, and under the NDPA that consent copy is a regulated representation, so it must be accurate. Posture, in order of preference:
-  1. **Sign a zero-data-retention (ZDR) agreement before relying on the absolute claim.** Anthropic's API default is **30-day** retention for abuse monitoring; **ZDR is a separate enterprise agreement granted per-organisation**, not on by default. Constraint that feeds model choice: **ZDR is not available for the Fable/Mythos model families** ("covered models", 30-day retention required) — if the analysis model must be ZDR-eligible, those families are out. Do the equivalent for OCR (ZDR with Google, or a no-retention OCR path).
-  2. **If ZDR isn't in place, don't claim absolute deletion.** Use accurate copy: name the sub-processor, state content is sent for analysis and retained by the provider only transiently for abuse monitoring (up to 30 days) and not used for training, and link the provider's policy.
-  3. **Always:** keep training-exclusion on (Anthropic default), maintain a sub-processor list in the privacy notice, sign DPAs/sub-processor terms, log the consent event, keep egress consent-gated and per-document, and record all of this in the NDPA records of processing.
-  Recommendation: pursue ZDR (or no-retention OCR) as a Phase-3 blocking item; until signed, ship the *accurate-disclosure* wording rather than the absolute claim. Owner: founder; due Phase 3 exit.
+- **Model.** Default `gemini-2.5-pro` (config via `GEMINI_MODEL`). `gemini-2.5-flash` is a cheaper/faster fallback for short docs; Gemini 3 models are a drop-in upgrade on the same request shape if red-flag recall on Nigerian tenancy/loan agreements underperforms in Phase-3 evals. Keep the model ID a config value and A/B it. **Use the paid Gemini API or Vertex AI — the free AI Studio tier trains on submitted data and must not be used.**
+- **Structured output** (`responseMimeType: "application/json"` + `responseSchema` = §6.2) guarantees schema-valid JSON — no parse-retry loops.
+- **Context caching.** Gemini supports explicit context caching for the system prompt to cut input cost — but note explicit caching stores content with a TTL, which is **incompatible with strict ZDR** (below). For a zero-retention posture, rely on implicit in-memory caching (RAM only, doesn't break ZDR) and skip `cachedContent`.
+- **PDF/image input** is native via `inlineData` (base64) parts. The 50-page PRD cap is inside the API's document limits.
+- **Streaming** (`generateContentStream`) protects against HTTP timeouts on long analyses and feeds the progress UI.
+- **Error handling:** map 429/5xx to a friendly "busy, retrying" state with backoff; a safety block / empty candidate → "this document couldn't be analysed" with the local-only option; truncated output → retry at a higher `maxOutputTokens`.
+- **Do NOT enable Google Search/Maps grounding** for ContractScan — both force 30-day storage of prompts/outputs that cannot be disabled, which breaks the ZDR posture (and isn't needed for contract analysis).
+- **Retention / "ephemeral" claim — global best practice (decision, DECISIONS.md #7).** REQ-CONTRACT-005's consent copy promises "processed immediately and permanently deleted — never stored on our servers." On *our* servers that's true (in-memory design above). It is **not ours to promise for Google (Gemini) or Google Vision**, and under the NDPA that consent copy is a regulated representation, so it must be accurate. Posture, in order of preference:
+  1. **Get zero-data-retention before relying on the absolute claim.** On the **paid** Gemini API / Vertex AI, Google contractually does **not train** on prompts or responses; by default it logs them for a limited period for abuse monitoring. **ZDR is available by request per project** — once approved, content and identifiable metadata are dropped before logging. Unlike some providers there is **no model-family carve-out**. Caveats that must be honoured for ZDR: no Search/Maps grounding, no explicit context caching, no File API persistence. Do the equivalent for OCR (Vision ZDR/region controls, or a no-retention OCR path).
+  2. **If ZDR isn't yet approved, don't claim absolute deletion.** Use accurate copy: name the sub-processor (Google), state content is sent for analysis, retained only transiently (≈ limited-period abuse-monitoring logs) and **not used for training on the paid tier**, and link Google's policy.
+  3. **Always:** stay on the paid tier (training-excluded), maintain a sub-processor list in the privacy notice, sign the Google Cloud DPA / sub-processor terms, log the consent event, keep egress consent-gated and per-document, and record all of this in the NDPA records of processing.
+  Recommendation: request per-project Gemini **ZDR** (and a no-retention OCR path) as a Phase-3 blocking item; until approved, ship the *accurate-disclosure* wording rather than the absolute claim. Owner: founder; due Phase 3 exit.
 
 ### 6.4 Tier 1 — local analysis
 
@@ -400,10 +398,11 @@ Implementation notes:
 | ADR-003 | AI models downloaded on first run over Wi-Fi (not bundled) | Keeps store binary small (App Store risk); bundle Tesseract data only |
 | ADR-004 | Tier-2 via server proxy, never direct from device | API key protection, usage metering, single egress chokepoint for consent enforcement |
 | ADR-005 | Backup = opaque encrypted blobs + manifest, not row-level sync | Zero-knowledge requirement rules out server-readable rows; full sync is explicitly Phase 2 |
-| ADR-006 | Claude model ID is config, default `claude-sonnet-4-6` per PRD | Allows Opus 4.8 A/B for red-flag recall without an app release |
+| ADR-006 | Cloud Tier-2 model is **Gemini** (paid API/Vertex), model ID is config, default `gemini-2.5-pro` | Provider sits behind the `CloudContractAnalyzer` port; paid tier doesn't train on data and offers per-project ZDR with no model-family carve-out (DECISIONS #7). Model ID stays config for A/B without an app release |
 | ADR-007 | Password-derived KEK; **recovery phrase shipped in MVP** (not Phase 2) | NFR-SEC-003 forbids server-held keys, but "forgot password = lost backup" is unacceptable for this persona. Recovery phrase / encrypted recovery kit re-derives the key client-side, preserving zero-knowledge (DECISIONS.md #2) |
 | ADR-010 | Optional opt-in encrypted backup (≤5 GB) on the **free tier** | Core promise can't hold only for paying users; closes the device-loss reputational gap while keeping local-first the default (DECISIONS.md #1) |
 | ADR-011 | On-device analysis uses an **SLM**, cloud uses an **LLM**, user chooses; 3B on-device model dropped | 3B needs ~2 GB RAM; market skews to 2–4 GB-RAM devices, which would silently route everyone to cloud. SLM fits the hardware; cloud LLM stays available for depth (DECISIONS.md #3) |
+| ADR-012 | Ship a **companion web app** (Next.js on Vercel) sharing the `@vaultmind/*` packages; same zero-knowledge model, cloud (Gemini) AI, no on-device SLM in the browser | Reuses framework-agnostic logic (one implementation for mobile + web); keeps documents encrypted client-side. Browser key storage is softer than mobile's hardware-backed Keychain — surfaced honestly; mobile stays the privacy-maximum surface. See `docs/WEB_COMPANION.md` |
 | ADR-008 | Per-doc-type reminder policies with "effective expiry" instead of a flat T-90/30/7/0 schedule | A passport with <6 months validity is already unusable for most international travel; flat schedules notify after the real deadline has passed. Policy table is versioned remote JSON; flat schedule remains the default for unknown types |
 | ADR-009 | Compliance targets NDPA 2023, not NDPR 2019 | PRD cites the superseded regulation; building consent/records against NDPR means redoing the work |
 

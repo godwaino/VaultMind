@@ -1,6 +1,6 @@
 /**
  * Tier routing (ARCHITECTURE §6.1, DECISIONS #3). Decides whether a contract is
- * analysed on-device by the SLM (Tier 1, no egress) or in the cloud by Claude
+ * analysed on-device by the SLM (Tier 1, no egress) or in the cloud by Gemini
  * (Tier 2, consent-gated). The subscriber's choice wins; the device's capability
  * and the document's size/complexity decide what's possible.
  */

@@ -18,7 +18,7 @@ export type ConsentKey =
   | "analytics" // opt-in, event-names only, no content
   | "cloud_ocr_fallback" // send a low-confidence page to Google Vision
   | "cloud_backup" // upload client-side-encrypted blobs
-  | "tier2_ai"; // send a contract to the cloud LLM (Claude)
+  | "tier2_ai"; // send a contract to the cloud LLM (Gemini)
 
 /** Consent keys that gate document-content egress (trust boundary A -> B). */
 export const EGRESS_CONSENT_KEYS = [

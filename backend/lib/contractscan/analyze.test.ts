@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { handleAnalyze, FREE_TIER_MONTHLY_ANALYSES, type AnalyzeDeps } from "./analyze.js";
-import type { ClaudeClient, EntitlementStore, UsageCounter, AuditLog, Tier } from "./ports.js";
+import type { CloudContractAnalyzer, EntitlementStore, UsageCounter, AuditLog, Tier } from "./ports.js";
 import type { ContractAnalysis } from "@vaultmind/contractscan-core";
 
 const goodResult: ContractAnalysis = {
@@ -12,7 +12,7 @@ const goodResult: ContractAnalysis = {
   verdict: "standard", // deliberately understated -> should be escalated
 };
 
-function makeDeps(opts: { tier?: Tier; used?: number; claudeReturns?: unknown } = {}): AnalyzeDeps & {
+function makeDeps(opts: { tier?: Tier; used?: number; modelReturns?: unknown } = {}): AnalyzeDeps & {
   counters: Map<string, number>;
   audits: { count: number };
 } {
@@ -24,11 +24,11 @@ function makeDeps(opts: { tier?: Tier; used?: number; claudeReturns?: unknown } 
     async get(_u, metric) { return counters.get(metric) ?? 0; },
     async increment(_u, metric) { counters.set(metric, (counters.get(metric) ?? 0) + 1); },
   };
-  const claude: ClaudeClient = {
-    async analyzeContract() { return opts.claudeReturns ?? goodResult; },
+  const analyzer: CloudContractAnalyzer = {
+    async analyzeContract() { return opts.modelReturns ?? goodResult; },
   };
   const audit: AuditLog = { async record() { audits.count++; } };
-  const deps = { entitlements, usage, claude, audit, now: () => new Date("2026-06-15T00:00:00Z") };
+  const deps = { entitlements, usage, analyzer, audit, now: () => new Date("2026-06-15T00:00:00Z") };
   return Object.assign(deps, { counters, audits });
 }
 
@@ -55,7 +55,7 @@ describe("Tier-2 analyze handler", () => {
     expect(deps.audits.count).toBe(1);
   });
 
-  it("enforces the free-tier 2/month quota (402) and does not call Claude past it", async () => {
+  it("enforces the free-tier 2/month quota (402) and does not call the model past it", async () => {
     const deps = makeDeps({ tier: "free", used: FREE_TIER_MONTHLY_ANALYSES });
     const res = await handleAnalyze(base, deps);
     expect(res.status).toBe(402);
@@ -70,8 +70,8 @@ describe("Tier-2 analyze handler", () => {
     if (res.status === 200) expect(res.body.usage).toMatchObject({ limit: null, remaining: null });
   });
 
-  it("returns 502 when Claude yields a malformed result", async () => {
-    const res = await handleAnalyze(base, makeDeps({ claudeReturns: { verdict: "nonsense" } }));
+  it("returns 502 when the cloud model yields a malformed result", async () => {
+    const res = await handleAnalyze(base, makeDeps({ modelReturns: { verdict: "nonsense" } }));
     expect(res.status).toBe(502);
   });
 
