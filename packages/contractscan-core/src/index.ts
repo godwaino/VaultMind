@@ -1,8 +1,8 @@
 /**
  * @vaultmind/contractscan-core — ContractScan Lite domain logic (PRD Phase 3).
  * Shared result schema, tier routing, verdict rules, and on-device (Tier 1)
- * analysis. The Tier-2 Claude proxy lives in the backend (API key never ships in
- * the app, ADR-004).
+ * analysis. The Tier-2 cloud proxy (Gemini) lives in the backend (API key never
+ * ships in the app, ADR-004).
  */
 
 export {

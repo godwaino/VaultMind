@@ -113,11 +113,11 @@ Deliverable that carries forward: the waitlist becomes the Early Access invite p
 - Chunked map-reduce pipeline, GBNF-constrained output, verdict escalation rules; "less detailed" notice when local-only was chosen.
 - Build the **contract eval set**: ≥20 real Nigerian contracts (tenancy, employment offer, loan) with expert-annotated red flags — this is the quality bar for both tiers.
 
-### Week 13 — Tier 2 Claude integration
-- `/api/contractscan/analyze` per ARCHITECTURE §6.3: consent-token check, entitlement + 2/month counter (REQ-CONTRACT-012..014), in-memory handling, `@anthropic-ai/sdk` with `claude-sonnet-4-6` (config-driven), prompt-cached system prompt, PDF/image document blocks, structured outputs against the shared schema, SSE streaming to the app, typed error mapping (429/529/refusal/max_tokens).
+### Week 13 — Tier 2 Gemini integration
+- `/api/contractscan/analyze` per ARCHITECTURE §6.3: consent-token check, entitlement + 2/month counter (REQ-CONTRACT-012..014), in-memory handling, Google GenAI SDK (`@google/genai`) with `gemini-2.5-pro` (config-driven, paid tier/Vertex), `inlineData` PDF/image parts, structured output (`responseSchema` against the shared schema), SSE streaming to the app, typed error mapping (429/5xx/safety-block/truncation). No Search/Maps grounding or explicit caching (ZDR-incompatible).
 - Non-dismissable consent gate with exact PRD copy + "Analyse Locally Only" branch (REQ-CONTRACT-005).
-- **Compliance task (blocking exit):** Anthropic retention/ZDR arrangement or consent-copy alignment (ARCHITECTURE §6.3).
-- Run both tiers against the eval set; if Sonnet red-flag recall disappoints, A/B `claude-opus-4-8` via config.
+- **Compliance task (blocking exit):** per-project Gemini ZDR request (paid tier — no training) or consent-copy alignment (ARCHITECTURE §6.3, DECISIONS #7).
+- Run both tiers against the eval set; if `gemini-2.5-pro` red-flag recall disappoints, A/B `gemini-2.5-flash` (cheaper) or a Gemini 3 model via config.
 
 ### Week 14 — results UX + hardening
 - Structured scrollable results screen; clause-text-beside-explanation rendering (REQ-CONTRACT-007/008); prominent non-dismissable disclaimer on every result (REQ-CONTRACT-009); re-run action (REQ-CONTRACT-011); free-tier usage counter display (REQ-CONTRACT-014).
@@ -147,7 +147,7 @@ Deliverable that carries forward: the waitlist becomes the Early Access invite p
 | Eval sets (categorisation docs, contracts) | Grow weekly from Phase 1; quality gates at Phase 1/3 exits |
 | Metrics instrumentation (PRD §9 targets) | Land events with each feature, not retroactively |
 | Security review checklist | Each PR touching crypto/consent/egress paths |
-| Cost watch (Claude, Vision, SMS) | Weekly from Phase 3; per-analysis unit cost dashboard |
+| Cost watch (Gemini, Vision, SMS) | Weekly from Phase 3; per-analysis unit cost dashboard |
 
 ## Success-metric instrumentation map (PRD §9)
 

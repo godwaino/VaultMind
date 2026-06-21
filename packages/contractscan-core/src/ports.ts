@@ -1,7 +1,7 @@
 /**
  * Ports for ContractScan. Tier 1 runs entirely on-device behind `SlmContractAnalyzer`
- * (llama.rn + a GBNF grammar, DECISIONS #3). Tier 2's Claude client lives in the
- * backend, not here, because the API key must never ship in the app (ADR-004).
+ * (llama.rn + a GBNF grammar, DECISIONS #3). Tier 2's cloud client (Gemini) lives
+ * in the backend, not here, because the API key must never ship in the app (ADR-004).
  */
 
 import type { ImportantDate, RedFlag } from "./schema.js";

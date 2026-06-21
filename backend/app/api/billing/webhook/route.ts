@@ -12,16 +12,14 @@ import {
   verifyPaystackSignature,
   handlePaystackEvent,
   type PaystackEvent,
-  type EntitlementWriter,
 } from "../../../../lib/billing/paystack.js";
-
-const writer: EntitlementWriter = {
-  async apply() {
-    throw new Error("EntitlementWriter (Supabase) not configured (Phase 4 placeholder)");
-  },
-};
+import { missingEnv, notConfigured } from "../../../../lib/http.js";
+import { makeEntitlementWriter } from "../../../../lib/adapters/supabase.js";
 
 export async function POST(request: Request): Promise<Response> {
+  const missing = missingEnv(["PAYSTACK_SECRET_KEY", "SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"]);
+  if (missing.length) return notConfigured(`Billing is not configured (missing ${missing.join(", ")}).`);
+
   const raw = await request.text();
   const signature = request.headers.get("x-paystack-signature") ?? "";
   const secret = process.env.PAYSTACK_SECRET_KEY ?? "";
@@ -37,6 +35,6 @@ export async function POST(request: Request): Promise<Response> {
     return new Response("bad json", { status: 400 });
   }
 
-  await handlePaystackEvent(evt, { writer, now: () => new Date() });
+  await handlePaystackEvent(evt, { writer: makeEntitlementWriter(), now: () => new Date() });
   return new Response("ok", { status: 200 });
 }

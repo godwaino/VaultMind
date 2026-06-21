@@ -3,47 +3,38 @@
  * NFR-PERF-003 <2s @ 200 docs). SQLite FTS5 with the porter stemmer; BM25 ranking
  * boosted by category match, recency, and year hits. No embeddings in MVP (ADR-001).
  *
- * Storage: this implementation uses Node's built-in `node:sqlite` (run Node with
- * --experimental-sqlite / NODE_OPTIONS=--experimental-sqlite). On device the exact
- * same SQL runs on expo-sqlite, which also bundles FTS5. The index holds only data
- * already on the device; nothing here is networked.
+ * Cross-platform by design (mobile + web companion). The SQLite handle is injected,
+ * so this module imports NO platform SQLite directly:
+ *   - Node/dev/tests : `nodeSqliteDriver` from "@vaultmind/search/node" (node:sqlite)
+ *   - React Native   : an expo-sqlite driver
+ *   - Browser (web)  : a wa-sqlite / sql.js (WASM) driver — same SQL, same FTS5
+ * All three return the small `SqliteDb` shape below. The index holds only data
+ * already on the device/client; nothing here is networked.
  */
 
-import { createRequire } from "node:module";
 import { rewriteQuery } from "./query.js";
 
-/**
- * Minimal handle interface — the subset of node:sqlite / expo-sqlite we use. The
- * same SQL runs against expo-sqlite on device behind an adapter of this shape.
- */
-interface SqliteStatement {
+export { rewriteQuery, type RewrittenQuery } from "./query.js";
+
+/** The subset of node:sqlite / expo-sqlite / wa-sqlite a driver must provide. */
+export interface SqliteStatement {
   run(...params: (string | number)[]): unknown;
   get(...params: (string | number)[]): unknown;
   all(...params: (string | number)[]): unknown[];
 }
-interface SqliteDb {
+export interface SqliteDb {
   exec(sql: string): void;
   prepare(sql: string): SqliteStatement;
   close(): void;
 }
-
-// Loaded via createRequire so the bundler/test runner doesn't try to transform the
-// newer `node:sqlite` builtin. Requires Node run with --experimental-sqlite.
-const nodeRequire = createRequire(import.meta.url);
-function openInMemoryDb(): SqliteDb {
-  const { DatabaseSync } = nodeRequire("node:sqlite") as {
-    DatabaseSync: new (path: string) => SqliteDb;
-  };
-  return new DatabaseSync(":memory:");
-}
-
-export { rewriteQuery, type RewrittenQuery } from "./query.js";
+/** Factory that opens a fresh (in-memory) database handle. */
+export type SqliteDbFactory = () => SqliteDb;
 
 export interface SearchDocument {
   docId: string;
-  title: string;
   /** OCR text + any extracted body */
   text: string;
+  title: string;
   tags: string[];
   notes?: string;
   category: string;
@@ -83,8 +74,9 @@ const BM25_WEIGHTS = [
 export class SearchIndex {
   private readonly db: SqliteDb;
 
-  constructor() {
-    this.db = openInMemoryDb();
+  /** @param createDb platform driver (see module docs). */
+  constructor(createDb: SqliteDbFactory) {
+    this.db = createDb();
     this.db.exec(`
       CREATE VIRTUAL TABLE docs USING fts5(
         doc_id UNINDEXED,

@@ -10,23 +10,26 @@
 |---|---|
 | **Smart Document Vault** | Encrypted local storage, on-device OCR, AI auto-categorisation, plain-English search |
 | **ExpiryGuard** | Automatic expiry-date detection, offline reminder engine (90/30/7/0 days), urgency dashboard |
-| **ContractScan Lite** | Plain-English contract analysis — on-device for ≤10 pages, consent-gated Claude API for deeper analysis |
+| **ContractScan Lite** | Plain-English contract analysis — on-device SLM for ≤10 pages, consent-gated Gemini API for deeper analysis |
 
 ## Documents
 
 | Document | Purpose |
 |---|---|
 | `VaultMind_PRD_v1.0.docx` | Product Requirements Document (source of truth for scope) |
-| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | System architecture: local-first design, zero-knowledge encryption, AI pipeline (Tesseract / Llama 3.2 / Claude API), data model, security, ADRs |
+| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | System architecture: local-first design, zero-knowledge encryption, AI pipeline (Tesseract / on-device SLM / Gemini API), data model, security, ADRs |
 | [`docs/IMPLEMENTATION_PLAN.md`](docs/IMPLEMENTATION_PLAN.md) | 16-week phased build plan mapped to PRD phases, with exit criteria, risk burn-down, and metric instrumentation |
 | [`docs/DECISIONS.md`](docs/DECISIONS.md) | Decision log resolving the PR-review risks & open questions: free-tier backup, recovery phrase, SLM/LLM split, NDPA 2023, third-party retention posture, pricing, scope |
 | [`docs/PHASE0_STATUS.md`](docs/PHASE0_STATUS.md) … [`PHASE4_STATUS.md`](docs/PHASE4_STATUS.md) | Per-phase build status — what's tested vs. stubbed |
+| [`docs/OUTSTANDING.md`](docs/OUTSTANDING.md) | Consolidated remaining-work checklist + a "first week on a dev machine" sequence |
+| [`docs/WEB_COMPANION.md`](docs/WEB_COMPANION.md) | Web companion app — scope, zero-knowledge-on-web posture, shared-vs-new adapters |
+| [`docs/DEPLOY.md`](docs/DEPLOY.md) | Vercel deployment — two projects, env setup, what's done vs dev-machine steps |
 | [`docs/PENTEST_SCOPE.md`](docs/PENTEST_SCOPE.md) | Pre-launch penetration-test scope |
 | [`docs/privacy/PRIVACY_NOTICE.md`](docs/privacy/PRIVACY_NOTICE.md) | NDPA 2023 privacy notice (draft for counsel) |
 
 ## Monorepo & build status
 
-npm workspaces (TypeScript). Domain logic is built and unit-tested; native/AI/cloud pieces (Expo UI, Tesseract, the SLM, Supabase, Claude) sit behind injected interfaces with in-memory adapters for tests. **122 tests passing; `tsc -b` clean.**
+npm workspaces (TypeScript). Domain logic is built and unit-tested; native/AI/cloud pieces (Expo UI, Tesseract, the SLM, Supabase, Gemini) sit behind injected interfaces with in-memory adapters for tests. **122 tests passing; `tsc -b` clean.**
 
 ```bash
 npm install
@@ -46,12 +49,15 @@ npm test          # NODE_OPTIONS=--experimental-sqlite is set by the script (nod
 | `packages/backup-core` | Client-side encrypted backup, restore, manifest, remote wipe | 4 |
 | `backend/` | Next.js route logic: auth, ContractScan Tier-2 proxy, Paystack, account | 0–4 |
 | `supabase/` | Schema migrations + RLS + storage policies | 0 |
-| `apps/mobile/` | Expo app (structural stub) | 0+ |
+| `apps/mobile/` | Expo mobile app — hardware-backed, on-device SLM (structural stub) | 0+ |
+| `apps/web/` | Next.js **companion web app** — shares packages; cloud AI, in-browser encryption (structural stub) | — |
 
 ## Stack (summary)
 
-React Native + Expo · Next.js API routes on Vercel · Supabase (Postgres/Auth/Storage) · Tesseract + Llama 3.2 (on-device AI) · Anthropic Claude API (ContractScan Tier 2) · Paystack · Resend · Expo Push
+**Mobile:** React Native + Expo (hardware-backed, on-device SLM). **Web companion:** Next.js on Vercel (in-browser encryption, cloud AI) — see [`docs/WEB_COMPANION.md`](docs/WEB_COMPANION.md).
+
+Shared backend: Next.js API routes on Vercel · Supabase (Postgres/Auth/Storage) · Tesseract + on-device SLM (Llama 3.2-class) · Google Gemini API — paid/Vertex (ContractScan Tier 2) · Paystack · Resend · Expo Push / Web Push
 
 ## Architecture in one paragraph
 
-Documents never leave the device by default. All content is AES-256-GCM encrypted at rest with hardware-backed keys; search, categorisation, and reminders run fully offline. Three consent-gated egress paths exist — cloud OCR fallback, Tier-2 contract analysis (ephemeral, server-side proxy to Claude), and opt-in cloud backup (client-side encrypted with a password-derived key, so the server is zero-knowledge). The backend is a thin stateless layer for auth, billing, email, and those three proxied flows.
+Documents never leave the device by default. All content is AES-256-GCM encrypted at rest with hardware-backed keys; search, categorisation, and reminders run fully offline. Three consent-gated egress paths exist — cloud OCR fallback, Tier-2 contract analysis (ephemeral, server-side proxy to Gemini), and opt-in cloud backup (client-side encrypted with a password-derived key, so the server is zero-knowledge). The backend is a thin stateless layer for auth, billing, email, and those three proxied flows.
