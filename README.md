@@ -37,6 +37,14 @@ npm run typecheck
 npm test          # NODE_OPTIONS=--experimental-sqlite is set by the script (node:sqlite FTS5)
 ```
 
+### Deploying the backend (Vercel)
+
+`backend/` is a Next.js (App Router) API-only app. In the Vercel project settings set
+**Root Directory = `backend`** (leave "Include source files outside of the Root Directory"
+enabled so the workspace packages are available). Vercel then detects Next.js, installs at
+the repo root via npm workspaces, and serves `/` (health) plus the `/api/*` routes.
+Deploying from the repo root yields a `404: NOT_FOUND` because no framework lives there.
+
 | Package | Responsibility | Phase |
 |---|---|---|
 | `packages/crypto` | AES-256-GCM, Argon2id, zero-knowledge backup keyset + recovery phrase | 0 |

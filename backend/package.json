@@ -3,10 +3,23 @@
   "version": "0.0.0",
   "type": "module",
   "private": true,
-  "dependencies": {
-    "@vaultmind/validation": "*",
-    "@vaultmind/consent": "*",
-    "@vaultmind/contractscan-core": "*"
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start"
   },
-  "//": "Next.js + @supabase/supabase-js are added when the app is deployed to Vercel. Route handlers here use the web-standard Request/Response API so the core logic stays framework-agnostic and unit-testable."
+  "dependencies": {
+    "@vaultmind/consent": "*",
+    "@vaultmind/contractscan-core": "*",
+    "@vaultmind/validation": "*",
+    "next": "^15.3.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "//": "@supabase/supabase-js is added when the Supabase project is provisioned. Route handlers use the web-standard Request/Response API so the core logic stays framework-agnostic and unit-testable.",
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "@types/react": "19.2.17",
+    "typescript": "^5.6.3"
+  }
 }
