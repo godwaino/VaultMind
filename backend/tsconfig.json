@@ -1,20 +1,22 @@
 {
   "extends": "../tsconfig.base.json",
   "compilerOptions": {
-    "rootDir": ".",
-    "outDir": "./dist",
+    "composite": false,
+    "declaration": false,
+    "noEmit": true,
     "lib": ["ES2022", "DOM"],
     "types": ["node"],
     "paths": {
       "@vaultmind/validation": ["../packages/validation/src/index.ts"],
       "@vaultmind/consent": ["../packages/consent/src/index.ts"],
       "@vaultmind/contractscan-core": ["../packages/contractscan-core/src/index.ts"]
-    }
+    },
+    "allowJs": true,
+    "incremental": true,
+    "resolveJsonModule": true,
+    "jsx": "preserve",
+    "plugins": [{ "name": "next" }]
   },
-  "references": [
-    { "path": "../packages/validation" },
-    { "path": "../packages/consent" },
-    { "path": "../packages/contractscan-core" }
-  ],
-  "include": ["lib/**/*", "app/**/*"]
+  "include": ["app/**/*", "lib/**/*", ".next/types/**/*.ts"],
+  "exclude": ["node_modules"]
 }
