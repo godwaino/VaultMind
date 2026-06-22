@@ -9,6 +9,8 @@
     "start": "next start"
   },
   "dependencies": {
+    "@google/genai": "^2.9.0",
+    "@supabase/supabase-js": "^2.108.2",
     "@vaultmind/consent": "*",
     "@vaultmind/contractscan-core": "*",
     "@vaultmind/validation": "*",
@@ -16,7 +18,7 @@
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },
-  "//": "@supabase/supabase-js is added when the Supabase project is provisioned. Route handlers use the web-standard Request/Response API so the core logic stays framework-agnostic and unit-testable.",
+  "//": "lib/adapters/{supabase,gemini}.ts import @supabase/supabase-js and @google/genai directly, so they're declared here (Vercel builds with root directory = backend and only installs this workspace's deps). Route handlers use the web-standard Request/Response API so the core logic stays framework-agnostic and unit-testable.",
   "devDependencies": {
     "@types/node": "^22.10.0",
     "@types/react": "19.2.17",
