@@ -8,25 +8,25 @@
       "developmentClient": true,
       "distribution": "internal",
       "env": {
-        "EXPO_PUBLIC_SUPABASE_URL": "https://YOUR-PROJECT.supabase.co",
-        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "your-anon-key",
-        "EXPO_PUBLIC_API_BASE_URL": "https://api.vaultmind.app"
+        "EXPO_PUBLIC_SUPABASE_URL": "https://pyufwxxodxgawgybekzo.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB5dWZ3eHhvZHhnYXdneWJla3pvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEyNTE5MzYsImV4cCI6MjA5NjgyNzkzNn0.mGqp-rSgM8pOQ331m4hTOux5pXXF_wX8l44gmf09rPU",
+        "EXPO_PUBLIC_API_BASE_URL": "https://vault-mind-eight.vercel.app"
       }
     },
     "preview": {
       "distribution": "internal",
       "env": {
-        "EXPO_PUBLIC_SUPABASE_URL": "https://YOUR-PROJECT.supabase.co",
-        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "your-anon-key",
-        "EXPO_PUBLIC_API_BASE_URL": "https://api.vaultmind.app"
+        "EXPO_PUBLIC_SUPABASE_URL": "https://pyufwxxodxgawgybekzo.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB5dWZ3eHhvZHhnYXdneWJla3pvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEyNTE5MzYsImV4cCI6MjA5NjgyNzkzNn0.mGqp-rSgM8pOQ331m4hTOux5pXXF_wX8l44gmf09rPU",
+        "EXPO_PUBLIC_API_BASE_URL": "https://vault-mind-eight.vercel.app"
       }
     },
     "production": {
       "autoIncrement": true,
       "env": {
-        "EXPO_PUBLIC_SUPABASE_URL": "https://YOUR-PROJECT.supabase.co",
-        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "your-anon-key",
-        "EXPO_PUBLIC_API_BASE_URL": "https://api.vaultmind.app"
+        "EXPO_PUBLIC_SUPABASE_URL": "https://pyufwxxodxgawgybekzo.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB5dWZ3eHhvZHhnYXdneWJla3pvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEyNTE5MzYsImV4cCI6MjA5NjgyNzkzNn0.mGqp-rSgM8pOQ331m4hTOux5pXXF_wX8l44gmf09rPU",
+        "EXPO_PUBLIC_API_BASE_URL": "https://vault-mind-eight.vercel.app"
       }
     }
   },
