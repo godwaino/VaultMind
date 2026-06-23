@@ -17,7 +17,9 @@ jobs:
           cache: npm
 
       - name: Install
-        run: npm ci
+        # `npm install` (not `npm ci`) tolerates the lockfile lagging behind the
+        # apps/mobile workspace deps, which aren't committed to the lockfile yet.
+        run: npm install
 
       - name: Typecheck
         run: npm run typecheck

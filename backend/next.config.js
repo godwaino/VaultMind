@@ -16,6 +16,19 @@ const nextConfig = {
     "@vaultmind/consent",
     "@vaultmind/contractscan-core",
   ],
+  webpack: (config) => {
+    // Route handlers and lib/* use NodeNext-style import specifiers with explicit
+    // ".js" extensions that point at ".ts" sources. tsconfig uses moduleResolution
+    // "Bundler", under which Next.js does not auto-alias .js -> .ts, so webpack
+    // looks for a literal ".js" file and fails ("Module not found: .../foo.js").
+    // Teach it to resolve the TypeScript sources behind those specifiers.
+    config.resolve.extensionAlias = {
+      ".js": [".ts", ".tsx", ".js", ".jsx"],
+      ".mjs": [".mts", ".mjs"],
+      ".cjs": [".cts", ".cjs"],
+    };
+    return config;
+  },
 };
 
-module.exports = nextConfig;
+export default nextConfig;
