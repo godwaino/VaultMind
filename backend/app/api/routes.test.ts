@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { POST as registerPOST } from "./auth/register/route.js";
+import { POST as resendVerificationPOST } from "./auth/resend-verification/route.js";
 import { POST as analyzePOST } from "./contractscan/analyze/route.js";
 import { POST as webhookPOST } from "./billing/webhook/route.js";
 import { POST as exportPOST } from "./account/export/route.js";
@@ -30,6 +31,14 @@ function jsonReq(url: string, body: unknown): Request {
 describe("routes degrade gracefully when unconfigured (501, not 500)", () => {
   it("register → 501 without Supabase env", async () => {
     const res = await registerPOST(jsonReq("http://x/api/auth/register", { email: "a@b.com" }));
+    expect(res.status).toBe(501);
+    expect(((await res.json()) as { error: string }).error).toBe("not_configured");
+  });
+
+  it("resend-verification → 501 without Supabase env", async () => {
+    const res = await resendVerificationPOST(
+      jsonReq("http://x/api/auth/resend-verification", { email: "a@b.com" })
+    );
     expect(res.status).toBe(501);
     expect(((await res.json()) as { error: string }).error).toBe("not_configured");
   });

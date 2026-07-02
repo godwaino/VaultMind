@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "../../lib/supabaseClient";
+import { apiResendVerification } from "../../lib/api";
 
 export default function SignIn() {
   const router = useRouter();
@@ -11,6 +12,9 @@ export default function SignIn() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [unconfirmed, setUnconfirmed] = useState(false);
+  const [resending, setResending] = useState(false);
+  const [resent, setResent] = useState(false);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -18,10 +22,33 @@ export default function SignIn() {
     if (!sb) { setError("Sign-in isn't configured (missing Supabase keys)."); return; }
     setBusy(true);
     setError("");
+    setUnconfirmed(false);
+    setResent(false);
     const { error } = await sb.auth.signInWithPassword({ email, password });
     setBusy(false);
-    if (error) { setError(error.message); return; }
+    if (error) {
+      if (/email not confirmed/i.test(error.message)) {
+        setUnconfirmed(true);
+        setError("Your email isn't verified yet. Resend the link below and check your inbox.");
+      } else {
+        setError(error.message);
+      }
+      return;
+    }
     router.push("/app");
+  }
+
+  async function resendVerification() {
+    setResending(true);
+    setError("");
+    try {
+      await apiResendVerification(email);
+      setResent(true);
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setResending(false);
+    }
   }
 
   return (
@@ -37,6 +64,16 @@ export default function SignIn() {
           <input id="pw" type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
         </div>
         {error && <div className="error">{error}</div>}
+        {unconfirmed && (
+          <button
+            className="btn"
+            type="button"
+            disabled={resending || resent}
+            onClick={resendVerification}
+          >
+            {resending ? <span className="spinner" /> : resent ? "Verification email sent" : "Resend verification email"}
+          </button>
+        )}
         <button className="btn btn-primary" disabled={busy} type="submit">
           {busy ? <span className="spinner" /> : "Sign in"}
         </button>

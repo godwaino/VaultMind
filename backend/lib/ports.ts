@@ -26,6 +26,13 @@ export interface AuthProvider {
    * Throws DuplicateEmailError if the email already exists.
    */
   createUser(input: NewUser): Promise<{ userId: string }>;
+
+  /**
+   * Re-send the signup verification email for an already-registered-but-unconfirmed
+   * account (the path a user needs when the original email never arrived). Never
+   * throws for an unknown/already-confirmed email, to avoid leaking account existence.
+   */
+  resendVerification(email: string): Promise<void>;
 }
 
 export interface ProfileStore {

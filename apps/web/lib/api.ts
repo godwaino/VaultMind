@@ -34,6 +34,10 @@ export function apiRegister(body: RegisterBody) {
   return post<{ userId: string; emailVerificationRequired: true }>("/api/auth/register", body);
 }
 
+export function apiResendVerification(email: string) {
+  return post<{ sent: true }>("/api/auth/resend-verification", { email });
+}
+
 export interface AnalyzeBody {
   tier2ConsentGranted: boolean; mimeType: string; base64: string; signingParty: string;
 }

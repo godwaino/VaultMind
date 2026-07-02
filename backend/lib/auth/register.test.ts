@@ -9,6 +9,7 @@ function fakes(opts: { duplicate?: boolean } = {}) {
       if (opts.duplicate) throw new DuplicateEmailError();
       return { userId: "user-1" };
     },
+    async resendVerification() {},
   };
   const profiles: ProfileStore = {
     async insertProfile(p) {
