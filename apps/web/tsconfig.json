@@ -1,17 +1,17 @@
 {
-  "//": "Web app TS config. Excluded from the root `tsc -b` graph (needs next/react types installed on a dev machine), exactly like apps/mobile.",
-  "compilerOptions": {
-    "target": "ES2022",
-    "lib": ["ES2022", "DOM", "DOM.Iterable"],
-    "module": "ESNext",
-    "moduleResolution": "Bundler",
-    "jsx": "preserve",
-    "strict": true,
-    "esModuleInterop": true,
-    "skipLibCheck": true,
-    "noEmit": true,
-    "plugins": [{ "name": "next" }]
-  },
-  "include": ["app/**/*", "lib/**/*", "next-env.d.ts"],
-  "exclude": ["node_modules"]
+    "//": "Web app TS config. Excluded from the root `tsc -b` graph (needs next/react types installed on a dev machine), exactly like apps/mobile.",
+    "compilerOptions": {
+          "target": "ES2022",
+          "lib": ["ES2022", "DOM", "DOM.Iterable"],
+          "module": "ESNext",
+          "moduleResolution": "Bundler",
+          "jsx": "preserve",
+          "strict": true,
+          "esModuleInterop": true,
+          "skipLibCheck": true,
+          "noEmit": true,
+          "plugins": [{ "name": "next" }]
+    },
+    "include": ["app/**/*", "lib/**/*", "next-env.d.ts", "css.d.ts"],
+    "exclude": ["node_modules"]
 }
