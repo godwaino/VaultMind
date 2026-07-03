@@ -4,8 +4,6 @@
  * directly (they ship as .ts, not built JS). `output: 'standalone'` keeps the
  * Vercel/Docker image lean if self-hosting.
  */
-const path = require("path");
-
 /** @type {import('next').NextConfig} */
 const nextConfig = {
     output: "standalone",
@@ -25,19 +23,6 @@ const nextConfig = {
           config.resolve.extensionAlias = {
                   ".js": [".ts", ".tsx", ".js"],
                   ".mjs": [".mts", ".mjs"],
-          };
-          // The monorepo root pins react@18.2.0 for the Expo/React Native app,
-          // which conflicts with this app's react@18.3.1. npm nests a separate
-          // copy under apps/web/node_modules for direct imports here, but
-          // hoisted transitive deps (e.g. styled-jsx, pulled in by `next`
-          // itself) still resolve the root's react and collide with this
-          // app's react-dom at render time ("Cannot read properties of null
-          // (reading 'useContext')" while prerendering /404 and /500). Force
-          // every import in this app's bundle onto the single nested copy.
-          config.resolve.alias = {
-                  ...config.resolve.alias,
-                  react: path.resolve(__dirname, "node_modules/react"),
-                  "react-dom": path.resolve(__dirname, "node_modules/react-dom"),
           };
           return config;
     },
