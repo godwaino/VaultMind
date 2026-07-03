@@ -48,25 +48,47 @@ export function makeAuthProvider(sb: SupabaseClient = supabaseAdmin()): AuthProv
       const user = data.user;
       if (!user) throw new Error("Supabase returned no user");
 
-      // Trigger the verification email via a signup link + Resend (best-effort).
+      // Trigger the verification email via a signup link + Resend. If that fails
+      // (e.g. RESEND_API_KEY missing/invalid), fall back to Supabase's own email
+      // delivery rather than silently dropping the email — an unconfirmed account
+      // with no email in flight is a dead end (POST /api/auth/resend-verification
+      // is also available if both attempts fail).
       try {
-        const { data: link } = await sb.auth.admin.generateLink({
+        const { data: link, error: linkError } = await sb.auth.admin.generateLink({
           type: "signup",
           email: input.email,
           password: input.password,
         });
+        if (linkError) throw new Error(linkError.message);
         const url = link?.properties?.action_link;
-        if (url) {
-          await sendEmail({
-            to: input.email,
-            subject: "Verify your VaultMind email",
-            html: `<p>Welcome to VaultMind. Please verify your email:</p><p><a href="${url}">Verify my email</a></p>`,
+        if (!url) throw new Error("Supabase did not return a verification link");
+        await sendEmail({
+          to: input.email,
+          subject: "Verify your VaultMind email",
+          html: `<p>Welcome to VaultMind. Please verify your email:</p><p><a href="${url}">Verify my email</a></p>`,
+        });
+      } catch (sendErr) {
+        console.error("registration verification email failed, falling back to Supabase delivery", {
+          email: input.email,
+          error: sendErr instanceof Error ? sendErr.message : String(sendErr),
+        });
+        const { error: resendError } = await sb.auth.resend({ type: "signup", email: input.email });
+        if (resendError) {
+          console.error("fallback verification email also failed", {
+            email: input.email,
+            error: resendError.message,
           });
         }
-      } catch {
-        // verification email is best-effort here; a resend endpoint can retry
       }
       return { userId: user.id };
+    },
+
+    async resendVerification(email) {
+      const { error } = await sb.auth.resend({ type: "signup", email });
+      if (error) {
+        // Don't leak account existence/confirmation state to the caller; just log.
+        console.error("resendVerification failed", { email, error: error.message });
+      }
     },
   };
 }
