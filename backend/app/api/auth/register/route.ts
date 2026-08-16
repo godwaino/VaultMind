@@ -11,20 +11,28 @@ import { makeAuthProvider, makeProfileStore, supabaseAdmin } from "../../../../l
 const REQUIRED_ENV = ["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"];
 
 export async function POST(request: Request): Promise<Response> {
-  const missing = missingEnv(REQUIRED_ENV);
-  if (missing.length) return notConfigured(`Auth is not configured (missing ${missing.join(", ")}).`);
-
-  let body: RegisterRequest;
   try {
-    body = (await request.json()) as RegisterRequest;
-  } catch {
-    return Response.json({ errors: ["Request body must be valid JSON."] }, { status: 400 });
-  }
+    const missing = missingEnv(REQUIRED_ENV);
+    if (missing.length) return notConfigured(`Auth is not configured (missing ${missing.join(", ")}).`);
 
-  const sb = supabaseAdmin();
-  const result = await handleRegister(body, {
-    auth: makeAuthProvider(sb),
-    profiles: makeProfileStore(sb),
-  });
-  return Response.json(result.body, { status: result.status });
+    let body: RegisterRequest;
+    try {
+      body = (await request.json()) as RegisterRequest;
+    } catch {
+      return Response.json({ errors: ["Request body must be valid JSON."] }, { status: 400 });
+    }
+
+    const sb = supabaseAdmin();
+    const result = await handleRegister(body, {
+      auth: makeAuthProvider(sb),
+      profiles: makeProfileStore(sb),
+    });
+    return Response.json(result.body, { status: result.status });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return Response.json(
+      { error: "server_error", detail: message },
+      { status: 500 }
+    );
+  }
 }
