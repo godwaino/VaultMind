@@ -80,11 +80,11 @@ class InMemoryJsDb implements SqliteDb {
           }
           if (sql.includes("doc_date >= ?")) {
             const dateFrom = params[pIdx++];
-            filtered = filtered.filter(r => r.doc_date >= dateFrom);
+            if (typeof dateFrom === "string") filtered = filtered.filter(r => r.doc_date >= dateFrom);
           }
           if (sql.includes("doc_date <= ?")) {
             const dateTo = params[pIdx++];
-            filtered = filtered.filter(r => r.doc_date <= dateTo);
+            if (typeof dateTo === "string") filtered = filtered.filter(r => r.doc_date <= dateTo);
           }
 
           filtered.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
@@ -116,11 +116,11 @@ class InMemoryJsDb implements SqliteDb {
         }
         if (sql.includes("doc_date >= ?")) {
           const dateFrom = params[pIdx++];
-          filtered = filtered.filter(r => r.doc_date >= dateFrom);
+          if (typeof dateFrom === "string") filtered = filtered.filter(r => r.doc_date >= dateFrom);
         }
         if (sql.includes("doc_date <= ?")) {
           const dateTo = params[pIdx++];
-          filtered = filtered.filter(r => r.doc_date <= dateTo);
+          if (typeof dateTo === "string") filtered = filtered.filter(r => r.doc_date <= dateTo);
         }
 
         // Assign simulated bm25 scores
