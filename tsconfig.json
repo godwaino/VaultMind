@@ -8,6 +8,8 @@
     { "path": "./packages/search" },
     { "path": "./packages/expiry-core" },
     { "path": "./packages/contractscan-core" },
-    { "path": "./packages/backup-core" }
+    { "path": "./packages/backup-core" },
+    { "path": "./packages/billing-core" },
+    { "path": "./packages/records-management" }
   ]
 }
